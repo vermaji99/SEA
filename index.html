@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Sea Animal Explorer</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="container"></div>
+
+    <!-- Inspect Mode Viewport -->
+    <div id="inspect-container" class="hidden">
+        <div id="inspect-overlay">
+            <button id="close-inspect">Back to Ocean</button>
+            <div id="inspect-info">
+                <h1 id="inspect-name">Great White Shark</h1>
+                <p id="inspect-fact">Did you know? Sharks have been around for over 400 million years.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Central Reticle -->
+    <div id="reticle"></div>
+
+    <!-- UI Overlay -->
+    <div id="ui-overlay">
+        <div id="loading-screen">
+            <div class="loader"></div>
+            <p>Loading the Ocean...</p>
+            <div id="progress-bar-container">
+                <div id="progress-bar"></div>
+            </div>
+        </div>
+
+        <div id="controls-hint">
+            <p><b>Free Swim:</b> W/A/S/D - Move | Q/E - Up/Down | Mouse - Look</p>
+            <p><b>Click</b> an animal to inspect | <b>ESC</b> to unlock mouse</p>
+        </div>
+
+        <div id="top-bar">
+            <button id="toggle-controls">Switch to Orbit Mode</button>
+        </div>
+
+        <div id="info-panel" class="hidden">
+            <h2 id="animal-name">Sea Animal</h2>
+            <p id="animal-description">A majestic creature of the deep ocean.</p>
+            <button id="back-button">Back to Explore</button>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
