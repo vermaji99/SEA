@@ -71,6 +71,11 @@ class SeaExplorer {
         this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         this.pixelRatio = Math.min(window.devicePixelRatio, this.isMobile ? 1.5 : 2.0);
         
+        // --- MOBILE TOUCH STATE ---
+        this.joystick = { active: false, x: 0, y: 0 };
+        this.lookDelta = { x: 0, y: 0 };
+        this.touchMove = { forward: 0, right: 0, up: 0, down: 0 };
+        
         // Physics/Movement constants
         this.DRAG = 0.95;
         this.ACCEL = 400.0;
@@ -110,6 +115,7 @@ class SeaExplorer {
         this.setupLighting();
         this.setupControls();
         this.setupEnvironment();
+        if (this.isMobile) this.setupMobileControls();
         await this.loadModels();
         this.setupUIEvents();
 
@@ -316,6 +322,103 @@ class SeaExplorer {
             if (!this.isInspecting) return;
             // OrbitControls already handles zoom, but we can fine-tune if needed
         });
+    }
+
+    setupMobileControls() {
+        const mobileUI = document.getElementById('mobile-controls');
+        if (!mobileUI) return;
+        mobileUI.classList.remove('hidden');
+
+        const joystickKnob = document.getElementById('joystick-knob');
+        const joystickBase = document.getElementById('joystick-base');
+        const lookArea = document.getElementById('look-area');
+        const btnUp = document.getElementById('btn-up');
+        const btnDown = document.getElementById('btn-down');
+
+        // --- JOYSTICK LOGIC ---
+        const handleJoystick = (e) => {
+            const touch = e.touches[0];
+            const rect = joystickBase.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            let dx = touch.clientX - centerX;
+            let dy = touch.clientY - centerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const maxDist = rect.width / 2;
+
+            if (dist > maxDist) {
+                dx *= maxDist / dist;
+                dy *= maxDist / dist;
+            }
+
+            joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+            
+            // Normalize for movement
+            this.joystick.x = dx / maxDist;
+            this.joystick.y = dy / maxDist;
+            
+            this.moveForward = this.joystick.y < -0.2;
+            this.moveBackward = this.joystick.y > 0.2;
+            this.moveLeft = this.joystick.x < -0.2;
+            this.moveRight = this.joystick.x > 0.2;
+        };
+
+        joystickBase.addEventListener('touchstart', (e) => {
+            this.joystick.active = true;
+            handleJoystick(e);
+        });
+
+        joystickBase.addEventListener('touchmove', (e) => {
+            if (this.joystick.active) {
+                e.preventDefault();
+                handleJoystick(e);
+            }
+        });
+
+        joystickBase.addEventListener('touchend', () => {
+            this.joystick.active = false;
+            this.joystick.x = 0;
+            this.joystick.y = 0;
+            joystickKnob.style.transform = 'translate(0, 0)';
+            this.moveForward = this.moveBackward = this.moveLeft = this.moveRight = false;
+        });
+
+        // --- LOOK AREA LOGIC ---
+        let lastTouchX = 0;
+        let lastTouchY = 0;
+
+        lookArea.addEventListener('touchstart', (e) => {
+            lastTouchX = e.touches[0].clientX;
+            lastTouchY = e.touches[0].clientY;
+        });
+
+        lookArea.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const dx = touch.clientX - lastTouchX;
+            const dy = touch.clientY - lastTouchY;
+            
+            // Sensitivity
+            const sensitivity = 0.005;
+            this.camera.rotation.y -= dx * sensitivity;
+            
+            // Vertical look with limits
+            const verticalSensitivity = 0.003;
+            const newRotationX = this.camera.rotation.x - dy * verticalSensitivity;
+            if (Math.abs(newRotationX) < Math.PI / 3) {
+                this.camera.rotation.x = newRotationX;
+            }
+
+            lastTouchX = touch.clientX;
+            lastTouchY = touch.clientY;
+        });
+
+        // --- VERTICAL BUTTONS ---
+        btnUp.addEventListener('touchstart', (e) => { e.preventDefault(); this.moveUp = true; });
+        btnUp.addEventListener('touchend', () => { this.moveUp = false; });
+        btnDown.addEventListener('touchstart', (e) => { e.preventDefault(); this.moveDown = true; });
+        btnDown.addEventListener('touchend', () => { this.moveDown = false; });
     }
 
     setupEnvironment() {
@@ -732,6 +835,8 @@ class SeaExplorer {
     setupUIEvents() {
         const toggleBtn = document.getElementById('toggle-controls');
         const closeInspectBtn = document.getElementById('close-inspect');
+        const reticle = document.getElementById('reticle');
+        const mobileControls = document.getElementById('mobile-controls');
 
         toggleBtn.addEventListener('click', () => {
             if (this.isInspecting) return;
@@ -740,36 +845,53 @@ class SeaExplorer {
                 this.orbitControls.enabled = false;
                 toggleBtn.innerText = 'Switch to Orbit Mode';
                 this.pointerLockControls.lock();
+                reticle.classList.remove('hidden');
+                if (this.isMobile) mobileControls.classList.remove('hidden');
             } else {
                 this.pointerLockControls.unlock();
                 this.orbitControls.enabled = true;
                 toggleBtn.innerText = 'Switch to Free Swim';
+                reticle.classList.add('hidden');
+                if (this.isMobile) mobileControls.classList.add('hidden');
             }
         });
 
         closeInspectBtn.addEventListener('click', () => {
             this.closeInspectMode();
         });
+
+        // Click/Touch for selection
+        const onInteraction = (event) => {
+            if (this.isInspecting) return;
+            
+            // Normalize mouse/touch coordinates
+            const clientX = event.clientX || (event.touches ? event.touches[0].clientX : 0);
+            const clientY = event.clientY || (event.touches ? event.touches[0].clientY : 0);
+
+            // Don't trigger if touching UI buttons or mobile controls
+            if (event.target.closest('button') || event.target.closest('#mobile-controls')) return;
+
+            this.mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            this.mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+            this.raycaster.setFromCamera(this.mouse, this.camera);
+            const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+
+            for (let i = 0; i < intersects.length; i++) {
+                const rootModel = this.getRootModel(intersects[i].object);
+                if (rootModel && rootModel.userData.isSeaAnimal) {
+                    this.openInspectMode(rootModel);
+                    break;
+                }
+            }
+        };
+
+        window.addEventListener('click', onInteraction);
+        window.addEventListener('touchstart', onInteraction, { passive: false });
     }
 
     onMouseClick(event) {
-        if (this.isInspecting) return;
-
-        // Reset mouse for raycasting using window-relative coordinates
-        this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-        this.raycaster.setFromCamera(this.mouse, this.camera);
-        // Deep search through all models and their children
-        const intersects = this.raycaster.intersectObjects(this.scene.children, true);
-
-        for (let i = 0; i < intersects.length; i++) {
-            const rootModel = this.getRootModel(intersects[i].object);
-            if (rootModel && rootModel.userData.isSeaAnimal) {
-                this.openInspectMode(rootModel);
-                break;
-            }
-        }
+        // Replaced by onInteraction in setupUIEvents
     }
 
     getRootModel(object) {
@@ -1109,6 +1231,7 @@ class SeaExplorer {
         this.inspectContainer.classList.add('hidden');
         document.getElementById('ui-overlay').classList.remove('hidden');
         document.getElementById('reticle').classList.remove('hidden');
+        if (this.isMobile) document.getElementById('mobile-controls').classList.remove('hidden');
         this.inspectControls.enabled = false;
 
         // --- 2. CLEANUP ---
@@ -1123,7 +1246,7 @@ class SeaExplorer {
         }
 
         // --- 3. RESUME MAIN SCENE ---
-        this.pointerLockControls.lock();
+        if (!this.isMobile) this.pointerLockControls.lock();
     }
 
     onWindowResize() {
@@ -1208,8 +1331,8 @@ class SeaExplorer {
             }
         }
 
-        // 2. Update movement and controls
-        if (this.isFreeSwim && this.pointerLockControls.isLocked) {
+        // Update movement and controls
+        if (this.isFreeSwim && (this.pointerLockControls.isLocked || this.isMobile)) {
             // Smooth acceleration with drag
             this.velocity.x *= this.DRAG;
             this.velocity.y *= this.DRAG;
@@ -1224,8 +1347,19 @@ class SeaExplorer {
             if (this.moveLeft || this.moveRight) this.velocity.x -= this.direction.x * this.ACCEL * delta;
             if (this.moveUp || this.moveDown) this.velocity.y -= this.direction.y * this.ACCEL * delta;
 
-            this.pointerLockControls.moveRight(-this.velocity.x * delta);
-            this.pointerLockControls.moveForward(-this.velocity.z * delta);
+            // Manual movement if not using pointerLock (for mobile)
+            if (this.isMobile) {
+                const rotation = this.camera.rotation.y;
+                const forward = new THREE.Vector3(Math.sin(rotation), 0, Math.cos(rotation));
+                const right = new THREE.Vector3(Math.sin(rotation + Math.PI/2), 0, Math.cos(rotation + Math.PI/2));
+                
+                this.camera.position.addScaledVector(forward, this.velocity.z * delta);
+                this.camera.position.addScaledVector(right, this.velocity.x * delta);
+            } else {
+                this.pointerLockControls.moveRight(-this.velocity.x * delta);
+                this.pointerLockControls.moveForward(-this.velocity.z * delta);
+            }
+            
             this.camera.position.y += this.velocity.y * delta;
 
             this.checkCollisions();

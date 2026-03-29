@@ -258,6 +258,105 @@ button:hover {
     color: #fff;
 }
 
+/* Mobile Controls Styling */
+#mobile-controls {
+    position: absolute;
+    bottom: 40px;
+    left: 0;
+    width: 100%;
+    height: 180px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 0 40px;
+    box-sizing: border-box;
+    z-index: 200;
+    pointer-events: none;
+}
+
+#mobile-controls.hidden {
+    display: none !important;
+}
+
+#joystick-container {
+    width: 140px;
+    height: 140px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+    backdrop-filter: blur(10px);
+}
+
+#joystick-base {
+    width: 100px;
+    height: 100px;
+    background: rgba(0, 170, 255, 0.1);
+    border-radius: 50%;
+    position: relative;
+}
+
+#joystick-knob {
+    width: 50px;
+    height: 50px;
+    background: #00aaff;
+    border-radius: 50%;
+    position: absolute;
+    top: 25px;
+    left: 25px;
+    box-shadow: 0 0 15px rgba(0, 170, 255, 0.5);
+    transition: transform 0.1s ease;
+}
+
+#look-area {
+    position: absolute;
+    top: -200%;
+    right: 40px;
+    width: 200px;
+    height: 200px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 12px;
+    text-transform: uppercase;
+    pointer-events: auto;
+}
+
+#vertical-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    pointer-events: auto;
+}
+
+#vertical-controls button {
+    width: 60px;
+    height: 60px;
+    padding: 0;
+    font-size: 24px;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Responsiveness (Hide desktop elements on mobile) */
+@media screen and (max-width: 768px) {
+    #controls-hint {
+        display: none !important;
+    }
+    
+    #info-panel {
+        width: 80% !important;
+        right: 10% !important;
+        padding: 20px !important;
+    }
+}
+
 #inspect-fact {
     margin: 0;
     font-size: 18px;
