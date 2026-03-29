@@ -374,13 +374,6 @@ class SeaExplorer {
                 pos: new THREE.Vector3(-1000, 200, -800),
                 rotation: new THREE.Euler(Math.PI, Math.PI, 0), // Fix upside down and mirror issue
                 fact: 'The Oarfish is the longest bony fish in the world, often mistaken for a sea serpent.'
-            },
-            { 
-                name: 'Commerson\'s Dolphin', 
-                path: 'models/dolphin/72ff854ec0fc4ef3a363522443295e6a_Textured.gltf', 
-                type: 'medium', 
-                pos: new THREE.Vector3(500, 100, 300),
-                fact: 'Commerson\'s Dolphins are small, energetic cetaceans known for their striking black-and-white patterns.'
             }
         ];
 
@@ -595,18 +588,6 @@ class SeaExplorer {
                                         side: THREE.DoubleSide
                                     });
                                 }
-                            } else if (config.name === 'Commerson\'s Dolphin') {
-                                child.material = new THREE.MeshStandardMaterial({
-                                    map: this.loadTexture('models/dolphin/ec9e77a3cb954cfda2d9bc7a9162a542_RGB_Commerson_s_dolphin_color1.png'),
-                                    normalMap: texLoader.load('models/dolphin/ab3fd7daf159407d8646891e275c9c0d_N_Commerson_s_dolphin_normal.png'),
-                                    roughnessMap: texLoader.load('models/dolphin/35f063814cc248b288c787bea73f6b1a_R_Commerson_s_dolphin_rough.png'),
-                                    metalnessMap: texLoader.load('models/dolphin/07250ac3b7bd4ccfba0b3655fa8337fe_R_Commerson_s_dolphin_spec.png'),
-                                    roughness: 0.8,
-                                    metalness: 0.1,
-                                    envMapIntensity: 1.0,
-                                    transparent: false,
-                                    opacity: 1.0
-                                });
                             }
                             
                             // --- SUPPLEMENTARY ADVANCED TEXTURING ---
@@ -820,14 +801,6 @@ class SeaExplorer {
                 mat.envMapIntensity = 1.5; // Boost reflections for the silvery look
                 mat.side = THREE.DoubleSide; // Visible from both sides
             }
-        } else if (name.includes('dolphin')) {
-            mat.map = this.loadTexture('models/dolphin/ec9e77a3cb954cfda2d9bc7a9162a542_RGB_Commerson_s_dolphin_color1.png');
-            mat.normalMap = this.texLoader.load('models/dolphin/ab3fd7daf159407d8646891e275c9c0d_N_Commerson_s_dolphin_normal.png');
-            mat.roughnessMap = this.texLoader.load('models/dolphin/35f063814cc248b288c787bea73f6b1a_R_Commerson_s_dolphin_rough.png');
-            mat.metalnessMap = this.texLoader.load('models/dolphin/07250ac3b7bd4ccfba0b3655fa8337fe_R_Commerson_s_dolphin_spec.png');
-            mat.roughness = 0.8;
-            mat.metalness = 0.1;
-            mat.envMapIntensity = 1.0;
         }
         
         mat.needsUpdate = true;
