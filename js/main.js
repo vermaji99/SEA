@@ -388,6 +388,13 @@ class SeaExplorer {
                 type: 'small', 
                 pos: new THREE.Vector3(-200, -50, 400),
                 fact: 'Clownfish have a symbiotic relationship with sea anemones.'
+            },
+            { 
+                name: 'Stingray', 
+                path: 'models/stingray/6babc34772b840348e7c7db56b430863_Textured.gltf', 
+                type: 'medium', 
+                pos: new THREE.Vector3(100, -90, 500),
+                fact: 'Stingrays are flat-bodied fish that often bury themselves in the sand.'
             }
         ];
 
@@ -588,9 +595,20 @@ class SeaExplorer {
                                         envMapIntensity: 0.5,
                                         transparent: true,
                                         opacity: 1.0,
-                                        side: THREE.DoubleSide
-                                    });
-                                } else {
+                                      side: THREE.DoubleSide
+                                  });
+                              } else if (config.name === 'Stingray') {
+                                  child.material = new THREE.MeshStandardMaterial({
+                                      map: this.loadTexture('models/stingray/93c965dfed57433b8d491e33bf0f33a0_RGB_Sea_Ray_Stingray_Diffuse.png'),
+                                      normalMap: texLoader.load('models/stingray/335894ec98c04293a8fbaabf09faa2aa_N_Sea_Ray_Stingray_Normal.png'),
+                                      roughnessMap: texLoader.load('models/stingray/22f6703b2be44683a5b320d837bd702e_R_Sea_Ray_Stingray_Metallic_Roughness.png'),
+                                      aoMap: texLoader.load('models/stingray/e2a7da80ab7943ae8ce2d4e352d9c661_R_Sea_Ray_Stingray_AO.png'),
+                                      roughness: 1.0,
+                                      metalness: 0.1,
+                                      envMapIntensity: 1.0,
+                                      side: THREE.DoubleSide
+                                  });
+                              } else {
                                     child.material = new THREE.MeshStandardMaterial({
                                         map: this.loadTexture('models/oarfish/bb6a5df390994ba78c92ecfecce9f1ed_RGB_Regalecus_glesne_low_body_BaseColor.png'),
                                         normalMap: texLoader.load('models/oarfish/3abbc74818d941bdbea33975c0b4eab7_N_Regalecus_glesne_low_body_Normal.png'),
@@ -855,6 +873,17 @@ class SeaExplorer {
             mat.metalnessMap = this.texLoader.load('models/clownfish/01a0069b31964baa821b9995d4e86370_R_clownfish_SPEC.png');
             mat.roughness = 0.6;
             mat.metalness = 0.0;
+            mat.envMapIntensity = 1.0;
+            mat.side = THREE.DoubleSide;
+        } else if (name.includes('stingray')) {
+            mat.map = this.loadTexture('models/stingray/93c965dfed57433b8d491e33bf0f33a0_RGB_Sea_Ray_Stingray_Diffuse.png');
+            mat.normalMap = this.texLoader.load('models/stingray/335894ec98c04293a8fbaabf09faa2aa_N_Sea_Ray_Stingray_Normal.png');
+            mat.roughnessMap = this.texLoader.load('models/stingray/22f6703b2be44683a5b320d837bd702e_R_Sea_Ray_Stingray_Metallic_Roughness.png');
+            mat.aoMap = this.texLoader.load('models/stingray/e2a7da80ab7943ae8ce2d4e352d9c661_R_Sea_Ray_Stingray_AO.png');
+            // Adding specular map for the wet look
+            mat.metalnessMap = this.texLoader.load('models/stingray/88f3e7f61f63434e91c29646ba614688_R_Sea_Ray_Stingray_Specular.png');
+            mat.roughness = 1.0;
+            mat.metalness = 0.1;
             mat.envMapIntensity = 1.0;
             mat.side = THREE.DoubleSide;
         }
