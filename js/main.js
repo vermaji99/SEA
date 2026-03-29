@@ -372,7 +372,7 @@ class SeaExplorer {
                 path: 'models/oarfish/12a7a91318614fa69bb5e12710f585d9_Textured.gltf', 
                 type: 'large', 
                 pos: new THREE.Vector3(-1000, 200, -800),
-                rotation: new THREE.Euler(Math.PI, 0, 0), // Fix upside down issue
+                rotation: new THREE.Euler(Math.PI, Math.PI, 0), // Fix upside down and mirror issue
                 fact: 'The Oarfish is the longest bony fish in the world, often mistaken for a sea serpent.'
             }
         ];
@@ -585,7 +585,7 @@ class SeaExplorer {
                                         roughness: 0.4,
                                         metalness: 0.8,
                                         envMapIntensity: 1.5,
-                                        side: THREE.FrontSide
+                                        side: THREE.DoubleSide
                                     });
                                 }
                             }
@@ -799,6 +799,7 @@ class SeaExplorer {
                 mat.roughness = 0.4; // More silvery/glossy than before
                 mat.metalness = 0.8; // High metalness for that chrome look
                 mat.envMapIntensity = 1.5; // Boost reflections for the silvery look
+                mat.side = THREE.DoubleSide; // Visible from both sides
             }
         }
         
@@ -840,9 +841,9 @@ class SeaExplorer {
             loadedModel.position.set(-center.x, -center.y, -center.z);
 
             // Apply orientation fix specifically for Oarfish in Inspect Mode too
-            if (model.userData.name === 'Oarfish') {
-                loadedModel.rotation.x = Math.PI;
-            }
+             if (model.userData.name === 'Oarfish') {
+                 loadedModel.rotation.set(Math.PI, Math.PI, 0);
+             }
 
             // Create pivot group
             this.inspectModel = new THREE.Group();
