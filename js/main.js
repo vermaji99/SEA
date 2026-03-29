@@ -372,6 +372,7 @@ class SeaExplorer {
                 path: 'models/oarfish/12a7a91318614fa69bb5e12710f585d9_Textured.gltf', 
                 type: 'large', 
                 pos: new THREE.Vector3(-1000, 200, -800),
+                rotation: new THREE.Euler(Math.PI, 0, 0), // Fix upside down issue
                 fact: 'The Oarfish is the longest bony fish in the world, often mistaken for a sea serpent.'
             }
         ];
@@ -404,6 +405,11 @@ class SeaExplorer {
                     
                     wrapper.scale.setScalar(s);
                     wrapper.position.copy(config.pos);
+                    
+                    // Apply custom rotation if specified in config
+                    if (config.rotation) {
+                        model.rotation.copy(config.rotation);
+                    }
                     
                     // ADVANCED TEXTURING & VISIBILITY
                     wrapper.traverse(child => {
@@ -832,6 +838,11 @@ class SeaExplorer {
             
             // Offset the inner model so its volume center is at (0,0,0)
             loadedModel.position.set(-center.x, -center.y, -center.z);
+
+            // Apply orientation fix specifically for Oarfish in Inspect Mode too
+            if (model.userData.name === 'Oarfish') {
+                loadedModel.rotation.x = Math.PI;
+            }
 
             // Create pivot group
             this.inspectModel = new THREE.Group();
