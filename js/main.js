@@ -552,23 +552,34 @@ class SeaExplorer {
                                         normalMap: texLoader.load('models/oarfish/26cd06e236794f0eb7ecd9c9d4ffe0f8_N_Regalecus_glesne_low_eye_Normal.png'),
                                         roughnessMap: texLoader.load('models/oarfish/fa6647868f85469caab195bab24f211e_R_Regalecus_glesne_low_eye_Roughness.png'),
                                         metalnessMap: texLoader.load('models/oarfish/c2868a858b7e41b593ef6e87b452198d_RGB_Regalecus_glesne_low_eye_Metallic.png'),
-                                        roughness: 0.1,
-                                        metalness: 0.3,
+                                        roughness: 0.05,
+                                        metalness: 0.5,
                                         envMapIntensity: 1.0
+                                    });
+                                } else if (lowerChildName.includes('fin')) {
+                                    child.material = new THREE.MeshStandardMaterial({
+                                        color: 0xff0000,
+                                        emissive: 0xaa0000,
+                                        emissiveIntensity: 0.5,
+                                        map: this.loadTexture('models/oarfish/bb6a5df390994ba78c92ecfecce9f1ed_RGB_Regalecus_glesne_low_body_BaseColor.png'),
+                                        alphaMap: texLoader.load('models/oarfish/e4f6664e02f04a4e95af7b9a28ce028f_A_Regalecus_glesne_alpha.png'),
+                                        roughness: 0.3,
+                                        metalness: 0.2,
+                                        envMapIntensity: 0.5,
+                                        transparent: true,
+                                        opacity: 1.0,
+                                        side: THREE.DoubleSide
                                     });
                                 } else {
                                     child.material = new THREE.MeshStandardMaterial({
                                         map: this.loadTexture('models/oarfish/bb6a5df390994ba78c92ecfecce9f1ed_RGB_Regalecus_glesne_low_body_BaseColor.png'),
                                         normalMap: texLoader.load('models/oarfish/3abbc74818d941bdbea33975c0b4eab7_N_Regalecus_glesne_low_body_Normal.png'),
                                         roughnessMap: texLoader.load('models/oarfish/4fff89c104bb416bbd72ddd0c8d129d1_R_Regalecus_glesne_low_body_Roughness.png'),
-                                        alphaMap: texLoader.load('models/oarfish/e4f6664e02f04a4e95af7b9a28ce028f_A_Regalecus_glesne_alpha.png'),
                                         metalnessMap: texLoader.load('models/oarfish/2ef7d29f7d2a446391c0ecc68b5bf187_RGB_Regalecus_glesne_specular.png'),
-                                        roughness: 1.0,
-                                        metalness: 0.0,
-                                        envMapIntensity: 0.5,
-                                        transparent: true,
-                                        opacity: 1.0,
-                                        side: THREE.DoubleSide
+                                        roughness: 0.4,
+                                        metalness: 0.8,
+                                        envMapIntensity: 1.5,
+                                        side: THREE.FrontSide
                                     });
                                 }
                             }
@@ -760,18 +771,28 @@ class SeaExplorer {
                 mat.normalMap = this.texLoader.load('models/oarfish/26cd06e236794f0eb7ecd9c9d4ffe0f8_N_Regalecus_glesne_low_eye_Normal.png');
                 mat.roughnessMap = this.texLoader.load('models/oarfish/fa6647868f85469caab195bab24f211e_R_Regalecus_glesne_low_eye_Roughness.png');
                 mat.metalnessMap = this.texLoader.load('models/oarfish/c2868a858b7e41b593ef6e87b452198d_RGB_Regalecus_glesne_low_eye_Metallic.png');
-                mat.roughness = 0.1;
-                mat.metalness = 0.3;
+                mat.roughness = 0.05;
+                mat.metalness = 0.5;
+            } else if (lowerChildName.includes('fin')) {
+                // Vibrant red for all fins/crest as seen in the image
+                mat.color = new THREE.Color(0xff0000); 
+                mat.emissive = new THREE.Color(0xaa0000);
+                mat.emissiveIntensity = 0.5;
+                mat.map = this.loadTexture('models/oarfish/bb6a5df390994ba78c92ecfecce9f1ed_RGB_Regalecus_glesne_low_body_BaseColor.png');
+                mat.alphaMap = this.texLoader.load('models/oarfish/e4f6664e02f04a4e95af7b9a28ce028f_A_Regalecus_glesne_alpha.png');
+                mat.transparent = true;
+                mat.side = THREE.DoubleSide;
+                mat.roughness = 0.3;
+                mat.metalness = 0.2;
             } else {
+                // Silvery body with dark spots
                 mat.map = this.loadTexture('models/oarfish/bb6a5df390994ba78c92ecfecce9f1ed_RGB_Regalecus_glesne_low_body_BaseColor.png');
                 mat.normalMap = this.texLoader.load('models/oarfish/3abbc74818d941bdbea33975c0b4eab7_N_Regalecus_glesne_low_body_Normal.png');
                 mat.roughnessMap = this.texLoader.load('models/oarfish/4fff89c104bb416bbd72ddd0c8d129d1_R_Regalecus_glesne_low_body_Roughness.png');
-                mat.alphaMap = this.texLoader.load('models/oarfish/e4f6664e02f04a4e95af7b9a28ce028f_A_Regalecus_glesne_alpha.png');
-                // Use specular as a metalness map if appropriate, or just for environment reflection
                 mat.metalnessMap = this.texLoader.load('models/oarfish/2ef7d29f7d2a446391c0ecc68b5bf187_RGB_Regalecus_glesne_specular.png');
-                mat.roughness = 0.8;
-                mat.metalness = 0.1;
-                mat.transparent = true; // For alpha map
+                mat.roughness = 0.4; // More silvery/glossy than before
+                mat.metalness = 0.8; // High metalness for that chrome look
+                mat.envMapIntensity = 1.5; // Boost reflections for the silvery look
             }
         }
         
