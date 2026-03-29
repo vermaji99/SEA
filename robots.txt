@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Allow: /js/
+Allow: /models/
+Allow: /assets/
+
+Sitemap: https://sea-lime-six.vercel.app/sitemap.xml
