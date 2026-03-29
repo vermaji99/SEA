@@ -418,6 +418,7 @@ class SeaExplorer {
                 path: 'models/clownfish/80365cf8644744ff8f8fddc24670e073_Textured.gltf', 
                 type: 'small', 
                 pos: new THREE.Vector3(-200, -50, 400),
+                rotation: new THREE.Euler(Math.PI, 0, 0), // Fix upside down issue
                 fact: 'Clownfish have a symbiotic relationship with sea anemones.'
             },
             { 
@@ -691,6 +692,7 @@ class SeaExplorer {
                         fact: config.fact,
                         sourcePath: config.path, // Store path for reloading
                         animations: gltf.animations, // Store original animations
+                        rotation: config.rotation, // Store original rotation fix
                         phase: Math.random() * Math.PI * 2,
                         originalPos: wrapper.position.clone(),
                         velocity: new THREE.Vector3((Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.1)
@@ -985,10 +987,10 @@ class SeaExplorer {
             // Offset the inner model so its volume center is at (0,0,0)
             loadedModel.position.set(-center.x, -center.y, -center.z);
 
-            // Apply orientation fix specifically for Oarfish in Inspect Mode too
-             if (model.userData.name === 'Oarfish') {
-                 loadedModel.rotation.set(Math.PI, Math.PI, 0);
-             }
+            // Apply orientation fix from config if available (e.g., Oarfish, Clownfish)
+            if (model.userData.rotation) {
+                loadedModel.rotation.copy(model.userData.rotation);
+            }
 
             // Create pivot group
             this.inspectModel = new THREE.Group();
