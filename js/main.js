@@ -381,6 +381,13 @@ class SeaExplorer {
                 type: 'medium', 
                 pos: new THREE.Vector3(500, 100, 300),
                 fact: 'Bottlenose Dolphins are highly intelligent and social marine mammals.'
+            },
+            { 
+                name: 'Clownfish', 
+                path: 'models/clownfish/80365cf8644744ff8f8fddc24670e073_Textured.gltf', 
+                type: 'small', 
+                pos: new THREE.Vector3(-200, -50, 400),
+                fact: 'Clownfish have a symbiotic relationship with sea anemones.'
             }
         ];
 
@@ -603,11 +610,24 @@ class SeaExplorer {
                                     metalnessMap: texLoader.load('models/dolphin/85b68f5095c241599f5ae7c882a152fe_RGB_bottlenose_dolphin_spec.png'),
                                     roughness: 0.8,
                                     metalness: 0.1,
-                                    envMapIntensity: 1.0,
-                                    transparent: false,
-                                    opacity: 1.0
-                                });
-                            }
+                                     envMapIntensity: 1.0,
+                                     transparent: false,
+                                     opacity: 1.0
+                                 });
+                             } else if (config.name === 'Clownfish') {
+                                 child.material = new THREE.MeshStandardMaterial({
+                                     map: this.loadTexture('models/clownfish/d9d749a9d97a4963bd99b2b080eed4fb_RGB_clownfish_COLOR.png'),
+                                     normalMap: texLoader.load('models/clownfish/a200d9f8db674b4a8def77c642cd271c_N_clownfish_NRM.png'),
+                                     roughnessMap: texLoader.load('models/clownfish/c69d7b1a9da9411ab0afae7bed1b29a7_R_clownfish_ROUGH.png'),
+                                     metalnessMap: texLoader.load('models/clownfish/01a0069b31964baa821b9995d4e86370_R_clownfish_SPEC.png'),
+                                     roughness: 0.6,
+                                     metalness: 0.0,
+                                     envMapIntensity: 1.0,
+                                     transparent: false,
+                                     opacity: 1.0,
+                                     side: THREE.DoubleSide
+                                 });
+                             }
                             
                             // --- SUPPLEMENTARY ADVANCED TEXTURING ---
                             this.applyAdvancedTextures(child, config.name);
@@ -828,6 +848,15 @@ class SeaExplorer {
             mat.roughness = 0.8;
             mat.metalness = 0.1;
             mat.envMapIntensity = 1.0;
+        } else if (name.includes('clownfish')) {
+            mat.map = this.loadTexture('models/clownfish/d9d749a9d97a4963bd99b2b080eed4fb_RGB_clownfish_COLOR.png');
+            mat.normalMap = this.texLoader.load('models/clownfish/a200d9f8db674b4a8def77c642cd271c_N_clownfish_NRM.png');
+            mat.roughnessMap = this.texLoader.load('models/clownfish/c69d7b1a9da9411ab0afae7bed1b29a7_R_clownfish_ROUGH.png');
+            mat.metalnessMap = this.texLoader.load('models/clownfish/01a0069b31964baa821b9995d4e86370_R_clownfish_SPEC.png');
+            mat.roughness = 0.6;
+            mat.metalness = 0.0;
+            mat.envMapIntensity = 1.0;
+            mat.side = THREE.DoubleSide;
         }
         
         mat.needsUpdate = true;
