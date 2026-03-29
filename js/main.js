@@ -374,6 +374,13 @@ class SeaExplorer {
                 pos: new THREE.Vector3(-1000, 200, -800),
                 rotation: new THREE.Euler(Math.PI, Math.PI, 0), // Fix upside down and mirror issue
                 fact: 'The Oarfish is the longest bony fish in the world, often mistaken for a sea serpent.'
+            },
+            { 
+                name: 'Bottlenose Dolphin', 
+                path: 'models/dolphin/d165e4ce842d408e99133f77f1fc37fb_Textured.gltf', 
+                type: 'medium', 
+                pos: new THREE.Vector3(500, 100, 300),
+                fact: 'Bottlenose Dolphins are highly intelligent and social marine mammals.'
             }
         ];
 
@@ -588,6 +595,18 @@ class SeaExplorer {
                                         side: THREE.DoubleSide
                                     });
                                 }
+                            } else if (config.name === 'Bottlenose Dolphin') {
+                                child.material = new THREE.MeshStandardMaterial({
+                                    map: this.loadTexture('models/dolphin/c90700b9891f401084a6070e171e26e3_RGB_bottlenose_dolphin_color.png'),
+                                    normalMap: texLoader.load('models/dolphin/08c49536e43347848423c7a51e7c4c68_N_bottlenose_dolphin_normal.png'),
+                                    roughnessMap: texLoader.load('models/dolphin/7c8f13a4f8e44aa08ef99ba7fc5eac03_R_bottlenose_dolphin_rough.png'),
+                                    metalnessMap: texLoader.load('models/dolphin/85b68f5095c241599f5ae7c882a152fe_RGB_bottlenose_dolphin_spec.png'),
+                                    roughness: 0.8,
+                                    metalness: 0.1,
+                                    envMapIntensity: 1.0,
+                                    transparent: false,
+                                    opacity: 1.0
+                                });
                             }
                             
                             // --- SUPPLEMENTARY ADVANCED TEXTURING ---
@@ -801,6 +820,14 @@ class SeaExplorer {
                 mat.envMapIntensity = 1.5; // Boost reflections for the silvery look
                 mat.side = THREE.DoubleSide; // Visible from both sides
             }
+        } else if (name.includes('dolphin')) {
+            mat.map = this.loadTexture('models/dolphin/c90700b9891f401084a6070e171e26e3_RGB_bottlenose_dolphin_color.png');
+            mat.normalMap = this.texLoader.load('models/dolphin/08c49536e43347848423c7a51e7c4c68_N_bottlenose_dolphin_normal.png');
+            mat.roughnessMap = this.texLoader.load('models/dolphin/7c8f13a4f8e44aa08ef99ba7fc5eac03_R_bottlenose_dolphin_rough.png');
+            mat.metalnessMap = this.texLoader.load('models/dolphin/85b68f5095c241599f5ae7c882a152fe_RGB_bottlenose_dolphin_spec.png');
+            mat.roughness = 0.8;
+            mat.metalness = 0.1;
+            mat.envMapIntensity = 1.0;
         }
         
         mat.needsUpdate = true;
