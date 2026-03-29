@@ -542,6 +542,13 @@ class SeaExplorer {
                 type: 'medium', 
                 pos: new THREE.Vector3(100, -90, 500),
                 fact: 'Stingrays are flat-bodied fish that often bury themselves in the sand.'
+            },
+            { 
+                name: 'Schooling Fish', 
+                path: 'models/schooling_fish/ce39f76cfab649fab1fa97d855cb56ac_Textured.gltf', 
+                type: 'medium', 
+                pos: new THREE.Vector3(-300, 40, -400),
+                fact: 'Schooling fish swim in coordinated groups to protect themselves from predators.'
             }
         ];
 
@@ -792,6 +799,14 @@ class SeaExplorer {
                                      envMapIntensity: 1.0,
                                      transparent: false,
                                      opacity: 1.0,
+                                     side: THREE.DoubleSide
+                                 });
+                             } else if (config.name === 'Schooling Fish') {
+                                 child.material = new THREE.MeshStandardMaterial({
+                                     map: this.loadTexture('models/schooling_fish/7ae31c21c8e545d095e29d21de1d1122_RGB_texture_Double_Saddle_Fish.png'),
+                                     roughness: 0.8,
+                                     metalness: 0.1,
+                                     envMapIntensity: 1.0,
                                      side: THREE.DoubleSide
                                  });
                              }
@@ -1075,6 +1090,12 @@ class SeaExplorer {
             // Add subtle emissive to see the bottom in dark areas
             mat.emissive = new THREE.Color(0x222222);
             mat.emissiveIntensity = 0.2;
+        } else if (name.includes('schooling')) {
+            mat.map = this.loadTexture('models/schooling_fish/7ae31c21c8e545d095e29d21de1d1122_RGB_texture_Double_Saddle_Fish.png');
+            mat.roughness = 0.8;
+            mat.metalness = 0.1;
+            mat.envMapIntensity = 1.0;
+            mat.side = THREE.DoubleSide;
         }
         
         mat.needsUpdate = true;
