@@ -55,6 +55,10 @@ class SeaExplorer {
         this.originalCameraPos = new THREE.Vector3(0, 150, 600);
         this.bubbles = null;
         
+        // --- PERFORMANCE OPTIMIZATION ---
+        this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        this.pixelRatio = Math.min(window.devicePixelRatio, this.isMobile ? 1.5 : 2.0);
+        
         // Physics/Movement constants
         this.DRAG = 0.95;
         this.ACCEL = 400.0;
@@ -72,12 +76,18 @@ class SeaExplorer {
         this.camera.position.copy(this.originalCameraPos);
         this.camera.lookAt(0, -100, 0);
 
-        this.renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
+        this.renderer = new THREE.WebGLRenderer({ 
+            antialias: !this.isMobile, // Disable antialiasing on mobile for performance
+            logarithmicDepthBuffer: true,
+            powerPreference: 'high-performance', // Hint to browser for GPU use
+            precision: this.isMobile ? 'mediump' : 'highp' // Adjust precision for mobile
+        });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        this.renderer.shadowMap.enabled = true;
+        this.renderer.setPixelRatio(this.pixelRatio);
+        this.renderer.shadowMap.enabled = !this.isMobile; // Disable shadows on mobile for smoothness
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.0; // Reduced from 1.6 for more natural lighting
+        this.renderer.toneMappingExposure = 1.0; 
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.container.appendChild(this.renderer.domElement);
 
@@ -137,6 +147,7 @@ class SeaExplorer {
         // --- NEW: BOTTOM LIGHT FOR STINGRAY VISIBILITY ---
         const bottomLight = new THREE.DirectionalLight(0xffffff, 1.5);
         bottomLight.position.set(0, -40, 0);
+        bottomLight.castShadow = !this.isMobile; // Optimization
         this.inspectScene.add(bottomLight);
 
         const bottomFill = new THREE.PointLight(0x88ccff, 1.0, 100);
@@ -148,7 +159,7 @@ class SeaExplorer {
         this.inspectScene.add(this.inspectHeadlight);
 
         // --- 3. FLOATING PARTICLES (Marine Snow) ---
-        const particleCount = 500;
+        const particleCount = this.isMobile ? 150 : 500; // Optimized count
         const geometry = new THREE.BufferGeometry();
         const positions = new Float32Array(particleCount * 3);
         for (let i = 0; i < particleCount * 3; i++) {
@@ -157,9 +168,9 @@ class SeaExplorer {
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         const material = new THREE.PointsMaterial({
             color: 0xffffff,
-            size: 0.1,
+            size: this.isMobile ? 0.2 : 0.1, // Larger particles for better visibility on mobile
             transparent: true,
-            opacity: 0.4, // Lowered opacity to avoid clutter
+            opacity: 0.4, 
             blending: THREE.AdditiveBlending
         });
         this.inspectParticles = new THREE.Points(geometry, material);
@@ -171,27 +182,26 @@ class SeaExplorer {
         sandTexture.wrapS = sandTexture.wrapT = THREE.RepeatWrapping;
         sandTexture.repeat.set(10, 10);
 
-        const floorGeo = new THREE.CircleGeometry(50, 64);
+        const floorGeo = new THREE.CircleGeometry(50, this.isMobile ? 32 : 64); // Lower detail for mobile
         const floorMat = new THREE.MeshStandardMaterial({
             color: 0xfff4d1,
             map: sandTexture,
             roughness: 0.8,
             metalness: 0.1,
             transparent: true,
-            opacity: 0.7 // More transparent to blend with background
+            opacity: 0.7 
         });
 
         this.inspectFloor = new THREE.Mesh(floorGeo, floorMat);
         this.inspectFloor.rotation.x = -Math.PI / 2;
-        this.inspectFloor.position.y = -10; // Position below the model
-        this.inspectFloor.receiveShadow = true;
+        this.inspectFloor.position.y = -10; 
+        this.inspectFloor.receiveShadow = !this.isMobile; // Optimization
         this.inspectScene.add(this.inspectFloor);
 
         // --- 5. ENVIRONMENT MAP (CRITICAL FOR PBR TEXTURES) ---
-        // A very bright studio for the environment map
         const pmremGenerator = new THREE.PMREMGenerator(this.renderer);
         const envScene = new THREE.Scene();
-        envScene.add(new THREE.AmbientLight(0xffffff, 10)); // Boosted ambient
+        envScene.add(new THREE.AmbientLight(0xffffff, 10)); 
         const envLight1 = new THREE.PointLight(0xffffff, 100);
         envLight1.position.set(10, 10, 10);
         envScene.add(envLight1);
@@ -199,6 +209,15 @@ class SeaExplorer {
         envLight2.position.set(-10, -10, -10);
         envScene.add(envLight2);
         this.inspectScene.environment = pmremGenerator.fromScene(envScene).texture;
+        
+        // Clean up temp PMREM scene
+        pmremGenerator.dispose();
+        envScene.traverse(child => {
+            if (child.isMesh) {
+                child.geometry.dispose();
+                child.material.dispose();
+            }
+        });
 
         // --- 6. PROFESSIONAL ORBIT CONTROLS ---
         this.inspectControls = new OrbitControls(this.inspectCamera, this.renderer.domElement);
@@ -219,8 +238,10 @@ class SeaExplorer {
 
         const sunLight = new THREE.DirectionalLight(0xffffff, 1.8);
         sunLight.position.set(50, 500, 50);
-        sunLight.castShadow = true;
-        sunLight.shadow.mapSize.set(2048, 2048);
+        sunLight.castShadow = !this.isMobile; // Optimization
+        if (!this.isMobile) {
+            sunLight.shadow.mapSize.set(1024, 1024); // Lowered from 2048 for better PC performance too
+        }
         this.scene.add(sunLight);
 
         const hemiLight = new THREE.HemisphereLight(0xa3d8f4, 0xfff4d1, 1.0); 
@@ -286,16 +307,16 @@ class SeaExplorer {
     }
 
     setupEnvironment() {
-        const texLoader = new THREE.TextureLoader();
+        const texLoader = this.texLoader;
         
         // Vast Bright Sand Floor (Brighter and larger)
         const sandTexture = texLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/terrain/grasslight-big.jpg'); 
         sandTexture.wrapS = sandTexture.wrapT = THREE.RepeatWrapping;
         sandTexture.repeat.set(100, 100);
 
-        const floorGeo = new THREE.PlaneGeometry(20000, 20000, 32, 32);
+        const floorGeo = new THREE.PlaneGeometry(10000, 10000); // Reduced from 20000 for performance
         const floorMat = new THREE.MeshStandardMaterial({
-            color: 0xfff4d1, // Brighter Yellowish-Beige Sand (from image)
+            color: 0xfff4d1, 
             map: sandTexture,
             roughness: 1.0,
             metalness: 0.0
@@ -303,15 +324,16 @@ class SeaExplorer {
 
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
-        floor.position.y = -100; // Raised floor position for visibility
-        floor.receiveShadow = true;
+        floor.position.y = -100; 
+        floor.receiveShadow = !this.isMobile; // Optimization
         this.scene.add(floor);
 
         // Very Subtle Bubbles
+        const bubbleCount = this.isMobile ? 50 : 200; // Optimized count
         const bubbleGeo = new THREE.SphereGeometry(0.5, 8, 8);
         const bubbleMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.05 });
         this.bubbles = new THREE.Group();
-        for (let i = 0; i < 200; i++) {
+        for (let i = 0; i < bubbleCount; i++) {
             const bubble = new THREE.Mesh(bubbleGeo, bubbleMat);
             bubble.position.set(
                 (Math.random() - 0.5) * 5000,
@@ -751,6 +773,23 @@ class SeaExplorer {
         return tex;
     }
 
+    // --- NEW: DISPOSAL HELPER FOR MEMORY MANAGEMENT ---
+    disposeModel(model) {
+        if (!model) return;
+        model.traverse(child => {
+            if (child.isMesh) {
+                child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => m.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            }
+        });
+    }
+
     applyAdvancedTextures(child, animalName) {
         if (!child.isMesh || !child.material) return;
         
@@ -919,9 +958,16 @@ class SeaExplorer {
         document.getElementById('inspect-name').innerText = model.userData.name;
         document.getElementById('inspect-fact').innerText = model.userData.fact || "Exploring this majestic creature.";
 
-        // --- 2. CLEAN PREVIOUS STATE ---
-        if (this.inspectModel) this.inspectScene.remove(this.inspectModel);
-        if (this.inspectMixer) this.inspectMixer.stopAllAction();
+        // --- 2. CLEAN PREVIOUS STATE (Proper Disposal) ---
+        if (this.inspectModel) {
+            this.disposeModel(this.inspectModel);
+            this.inspectScene.remove(this.inspectModel);
+            this.inspectModel = null;
+        }
+        if (this.inspectMixer) {
+            this.inspectMixer.stopAllAction();
+            this.inspectMixer = null;
+        }
 
         // --- 3. LOAD ACTUAL MODEL FROM SOURCE ---
         // Instead of cloning a potentially static instance, we reload from original source
@@ -1057,6 +1103,7 @@ class SeaExplorer {
             this.inspectMixer = null;
         }
         if (this.inspectModel) {
+            this.disposeModel(this.inspectModel);
             this.inspectScene.remove(this.inspectModel);
             this.inspectModel = null;
         }
