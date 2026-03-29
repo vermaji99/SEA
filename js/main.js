@@ -134,6 +134,15 @@ class SeaExplorer {
         rim.position.set(0, 10, -50);
         this.inspectScene.add(rim);
 
+        // --- NEW: BOTTOM LIGHT FOR STINGRAY VISIBILITY ---
+        const bottomLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        bottomLight.position.set(0, -40, 0);
+        this.inspectScene.add(bottomLight);
+
+        const bottomFill = new THREE.PointLight(0x88ccff, 1.0, 100);
+        bottomFill.position.set(0, -20, 0);
+        this.inspectScene.add(bottomFill);
+
         // Headlight (Follows camera)
         this.inspectHeadlight = new THREE.PointLight(0xffffff, 0.8, 200); 
         this.inspectScene.add(this.inspectHeadlight);
@@ -598,17 +607,19 @@ class SeaExplorer {
                                       side: THREE.DoubleSide
                                   });
                               } else if (config.name === 'Stingray') {
-                                  child.material = new THREE.MeshStandardMaterial({
-                                      map: this.loadTexture('models/stingray/93c965dfed57433b8d491e33bf0f33a0_RGB_Sea_Ray_Stingray_Diffuse.png'),
-                                      normalMap: texLoader.load('models/stingray/335894ec98c04293a8fbaabf09faa2aa_N_Sea_Ray_Stingray_Normal.png'),
-                                      roughnessMap: texLoader.load('models/stingray/22f6703b2be44683a5b320d837bd702e_R_Sea_Ray_Stingray_Metallic_Roughness.png'),
-                                      aoMap: texLoader.load('models/stingray/e2a7da80ab7943ae8ce2d4e352d9c661_R_Sea_Ray_Stingray_AO.png'),
-                                      roughness: 1.0,
-                                      metalness: 0.1,
-                                      envMapIntensity: 1.0,
-                                      side: THREE.DoubleSide
-                                  });
-                              } else {
+                                   child.material = new THREE.MeshStandardMaterial({
+                                       map: this.loadTexture('models/stingray/93c965dfed57433b8d491e33bf0f33a0_RGB_Sea_Ray_Stingray_Diffuse.png'),
+                                       normalMap: texLoader.load('models/stingray/335894ec98c04293a8fbaabf09faa2aa_N_Sea_Ray_Stingray_Normal.png'),
+                                       roughnessMap: texLoader.load('models/stingray/22f6703b2be44683a5b320d837bd702e_R_Sea_Ray_Stingray_Metallic_Roughness.png'),
+                                       aoMap: texLoader.load('models/stingray/e2a7da80ab7943ae8ce2d4e352d9c661_R_Sea_Ray_Stingray_AO.png'),
+                                       roughness: 0.8,
+                                       metalness: 0.1,
+                                       envMapIntensity: 1.0,
+                                       side: THREE.DoubleSide,
+                                       emissive: new THREE.Color(0x222222),
+                                       emissiveIntensity: 0.2
+                                   });
+                               } else {
                                     child.material = new THREE.MeshStandardMaterial({
                                         map: this.loadTexture('models/oarfish/bb6a5df390994ba78c92ecfecce9f1ed_RGB_Regalecus_glesne_low_body_BaseColor.png'),
                                         normalMap: texLoader.load('models/oarfish/3abbc74818d941bdbea33975c0b4eab7_N_Regalecus_glesne_low_body_Normal.png'),
@@ -882,10 +893,13 @@ class SeaExplorer {
             mat.aoMap = this.texLoader.load('models/stingray/e2a7da80ab7943ae8ce2d4e352d9c661_R_Sea_Ray_Stingray_AO.png');
             // Adding specular map for the wet look
             mat.metalnessMap = this.texLoader.load('models/stingray/88f3e7f61f63434e91c29646ba614688_R_Sea_Ray_Stingray_Specular.png');
-            mat.roughness = 1.0;
+            mat.roughness = 0.8;
             mat.metalness = 0.1;
             mat.envMapIntensity = 1.0;
             mat.side = THREE.DoubleSide;
+            // Add subtle emissive to see the bottom in dark areas
+            mat.emissive = new THREE.Color(0x222222);
+            mat.emissiveIntensity = 0.2;
         }
         
         mat.needsUpdate = true;
