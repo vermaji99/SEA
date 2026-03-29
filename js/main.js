@@ -443,20 +443,32 @@ class SeaExplorer {
         floor.receiveShadow = !this.isMobile; // Optimization
         this.scene.add(floor);
 
-        // Very Subtle Bubbles
-        const bubbleCount = this.isMobile ? 50 : 200; // Optimized count
+        // Efficient Bubbles using InstancedMesh (Massive Performance Win)
+        const bubbleCount = this.isMobile ? 100 : 400;
         const bubbleGeo = new THREE.SphereGeometry(0.5, 8, 8);
-        const bubbleMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.05 });
-        this.bubbles = new THREE.Group();
+        const bubbleMat = new THREE.MeshBasicMaterial({ 
+            color: 0xffffff, 
+            transparent: true, 
+            opacity: 0.05,
+            depthWrite: false // Performance optimization for transparent objects
+        });
+        
+        this.bubbles = new THREE.InstancedMesh(bubbleGeo, bubbleMat, bubbleCount);
+        this.bubbleData = [];
+        
+        const dummy = new THREE.Object3D();
         for (let i = 0; i < bubbleCount; i++) {
-            const bubble = new THREE.Mesh(bubbleGeo, bubbleMat);
-            bubble.position.set(
-                (Math.random() - 0.5) * 5000,
-                (Math.random() - 0.5) * 1000,
-                (Math.random() - 0.5) * 5000
-            );
-            bubble.userData.speed = Math.random() * 0.2 + 0.1;
-            this.bubbles.add(bubble);
+            const x = (Math.random() - 0.5) * 5000;
+            const y = (Math.random() - 0.5) * 1000;
+            const z = (Math.random() - 0.5) * 5000;
+            const speed = Math.random() * 0.2 + 0.1;
+            const offset = Math.random() * Math.PI * 2;
+            
+            dummy.position.set(x, y, z);
+            dummy.updateMatrix();
+            this.bubbles.setMatrixAt(i, dummy.matrix);
+            
+            this.bubbleData.push({ x, y, z, speed, offset });
         }
         this.scene.add(this.bubbles);
     }
@@ -1343,18 +1355,24 @@ class SeaExplorer {
         }
 
         // --- OPTIMIZED MAIN SCENE UPDATES ---
+        const dummy = new THREE.Object3D();
         
-        // 1. Update mixers only for models that are potentially visible
+        // 1. Update mixers and visibility (Distance Culling)
         for (const mixer of this.mixers) {
             const root = mixer.getRoot();
-            if (root && this.camera.position.distanceTo(root.position) < 3000) {
-                mixer.update(delta);
+            if (root) {
+                const dist = this.camera.position.distanceTo(root.position);
+                if (dist < 3000) {
+                    mixer.update(delta);
+                    root.visible = true;
+                } else {
+                    root.visible = false; 
+                }
             }
         }
 
-        // Update movement and controls
+        // 2. Update movement and controls
         if (this.isFreeSwim && (this.pointerLockControls.isLocked || this.isMobile)) {
-            // Smooth acceleration with drag
             this.velocity.x *= this.DRAG;
             this.velocity.y *= this.DRAG;
             this.velocity.z *= this.DRAG;
@@ -1368,61 +1386,51 @@ class SeaExplorer {
             if (this.moveLeft || this.moveRight) this.velocity.x -= this.direction.x * this.ACCEL * delta;
             if (this.moveUp || this.moveDown) this.velocity.y -= this.direction.y * this.ACCEL * delta;
 
-            // Manual movement if not using pointerLock (for mobile)
             if (this.isMobile) {
                 const rotation = this.camera.rotation.y;
                 const forward = new THREE.Vector3(Math.sin(rotation), 0, Math.cos(rotation));
                 const right = new THREE.Vector3(Math.sin(rotation + Math.PI/2), 0, Math.cos(rotation + Math.PI/2));
-                
                 this.camera.position.addScaledVector(forward, this.velocity.z * delta);
                 this.camera.position.addScaledVector(right, this.velocity.x * delta);
             } else {
                 this.pointerLockControls.moveRight(-this.velocity.x * delta);
                 this.pointerLockControls.moveForward(-this.velocity.z * delta);
             }
-            
             this.camera.position.y += this.velocity.y * delta;
-
             this.checkCollisions();
-            
-            // Subtle camera sway
             this.camera.position.y += Math.sin(time * 0.5) * 0.05;
-            this.camera.rotation.z += Math.cos(time * 0.5) * 0.0005;
         }
 
         if (this.orbitControls.enabled) {
             this.orbitControls.update();
         }
 
-        // 3. Animate models (Slow swimming and floating)
+        // 3. Animate models (Only if visible)
         for (const model of this.models) {
-            const userData = model.userData;
-            
-            // Only perform logic if within a reasonable distance
-            if (this.camera.position.distanceTo(model.position) < 4000) {
-                // Slow swimming
+            if (model.visible) {
+                const userData = model.userData;
                 model.position.addScaledVector(userData.velocity, 1.0);
-                
-                // Bounce back if out of bounds
                 if (Math.abs(model.position.x) > 1500) userData.velocity.x *= -1;
                 if (Math.abs(model.position.z) > 1500) userData.velocity.z *= -1;
-                
-                // Floating effect
                 model.position.y += Math.sin(time + userData.phase) * 0.05;
                 model.rotation.y += userData.velocity.x * 0.1;
                 model.rotation.z = Math.sin(time * 0.5 + userData.phase) * 0.1;
             }
         }
 
-        // 4. Animate bubbles (Skip if too many objects or distant)
-        if (this.bubbles) {
-            const skipStep = this.isMobile ? 2 : 1; // Performance skip on mobile
-            for (let i = 0; i < this.bubbles.children.length; i += skipStep) {
-                const bubble = this.bubbles.children[i];
-                bubble.position.y += bubble.userData.speed;
-                if (bubble.position.y > 500) bubble.position.y = -500;
-                bubble.position.x += Math.sin(time + bubble.position.y) * 0.1;
+        // 4. Animate bubbles (Using InstancedMesh for extreme speed)
+        if (this.bubbles && this.bubbleData) {
+            for (let i = 0; i < this.bubbleData.length; i++) {
+                const data = this.bubbleData[i];
+                data.y += data.speed;
+                if (data.y > 500) data.y = -500;
+                
+                const waveX = Math.sin(time + data.offset) * 2.0;
+                dummy.position.set(data.x + waveX, data.y, data.z);
+                dummy.updateMatrix();
+                this.bubbles.setMatrixAt(i, dummy.matrix);
             }
+            this.bubbles.instanceMatrix.needsUpdate = true;
         }
 
         this.renderer.render(this.scene, this.camera);
