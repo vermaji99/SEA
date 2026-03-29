@@ -48,7 +48,19 @@ class SeaExplorer {
         this.inspectZoom = 10;
         this.targetInspectZoom = 10;
         
-        this.texLoader = new THREE.TextureLoader();
+        // --- CENTRALIZED ASSET LOADING ---
+        this.loadingManager = new THREE.LoadingManager();
+        this.loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+            const progress = (itemsLoaded / itemsTotal) * 100;
+            const progressBar = document.getElementById('progress-bar');
+            if (progressBar) progressBar.style.width = progress + '%';
+        };
+        this.loadingManager.onLoad = () => {
+            const loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) loadingScreen.style.display = 'none';
+        };
+
+        this.texLoader = new THREE.TextureLoader(this.loadingManager);
         
         this.models = [];
         this.mixers = [];
@@ -1140,7 +1152,7 @@ class SeaExplorer {
 
     animate() {
         requestAnimationFrame(() => this.animate());
-        const delta = this.clock.getDelta();
+        const delta = Math.min(this.clock.getDelta(), 0.1); // Cap delta to avoid physics jumps
         const time = this.clock.getElapsedTime();
 
         if (this.isInspecting) {
@@ -1160,13 +1172,10 @@ class SeaExplorer {
                 const p = this.inspectModel.userData.phase;
 
                 // 1. Hard Center Lock
-                // We keep the group at (0,0,0) and only bob the model inside it
-                // BUT to maintain perfect pivot during bobbing, we must sync the target
                 const bob = Math.sin(p * 0.5) * 0.4;
                 this.inspectModel.position.y = bob;
                 
                 // CRITICAL: Update the OrbitControls target to follow the model's bobbing
-                // This ensures that the rotation axis is ALWAYS at the center of the model.
                 this.inspectControls.target.set(0, bob, 0);
 
                 // 2. Real-Life Breathing (Subtle scale pulse)
@@ -1189,12 +1198,17 @@ class SeaExplorer {
             return; 
         }
 
-        // Update mixers
+        // --- OPTIMIZED MAIN SCENE UPDATES ---
+        
+        // 1. Update mixers only for models that are potentially visible
         for (const mixer of this.mixers) {
-            mixer.update(delta);
+            const root = mixer.getRoot();
+            if (root && this.camera.position.distanceTo(root.position) < 3000) {
+                mixer.update(delta);
+            }
         }
 
-        // Update controls
+        // 2. Update movement and controls
         if (this.isFreeSwim && this.pointerLockControls.isLocked) {
             // Smooth acceleration with drag
             this.velocity.x *= this.DRAG;
@@ -1225,30 +1239,35 @@ class SeaExplorer {
             this.orbitControls.update();
         }
 
-        // Animate models (Slow swimming and floating)
+        // 3. Animate models (Slow swimming and floating)
         for (const model of this.models) {
             const userData = model.userData;
             
-            // Slow swimming
-            model.position.addScaledVector(userData.velocity, 1.0);
-            
-            // Bounce back if out of bounds
-            if (Math.abs(model.position.x) > 1500) userData.velocity.x *= -1;
-            if (Math.abs(model.position.z) > 1500) userData.velocity.z *= -1;
-            
-            // Floating effect
-            model.position.y += Math.sin(time + userData.phase) * 0.05;
-            model.rotation.y += userData.velocity.x * 0.1;
-            model.rotation.z = Math.sin(time * 0.5 + userData.phase) * 0.1;
+            // Only perform logic if within a reasonable distance
+            if (this.camera.position.distanceTo(model.position) < 4000) {
+                // Slow swimming
+                model.position.addScaledVector(userData.velocity, 1.0);
+                
+                // Bounce back if out of bounds
+                if (Math.abs(model.position.x) > 1500) userData.velocity.x *= -1;
+                if (Math.abs(model.position.z) > 1500) userData.velocity.z *= -1;
+                
+                // Floating effect
+                model.position.y += Math.sin(time + userData.phase) * 0.05;
+                model.rotation.y += userData.velocity.x * 0.1;
+                model.rotation.z = Math.sin(time * 0.5 + userData.phase) * 0.1;
+            }
         }
 
-        // Animate bubbles
+        // 4. Animate bubbles (Skip if too many objects or distant)
         if (this.bubbles) {
-            this.bubbles.children.forEach(bubble => {
+            const skipStep = this.isMobile ? 2 : 1; // Performance skip on mobile
+            for (let i = 0; i < this.bubbles.children.length; i += skipStep) {
+                const bubble = this.bubbles.children[i];
                 bubble.position.y += bubble.userData.speed;
                 if (bubble.position.y > 500) bubble.position.y = -500;
                 bubble.position.x += Math.sin(time + bubble.position.y) * 0.1;
-            });
+            }
         }
 
         this.renderer.render(this.scene, this.camera);
