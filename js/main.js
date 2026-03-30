@@ -128,7 +128,7 @@ class SeaExplorer {
         // Sky blue / light green-blue
         const seaBlue = new THREE.Color(0x70d1ff); 
         this.scene.background = seaBlue;
-        this.scene.fog = new THREE.FogExp2(0x70d1ff, this.isMobile ? 0.0015 : 0.001); 
+        this.scene.fog = new THREE.FogExp2(0x70d1ff, this.isMobile ? 0.0004 : 0.0002); 
 
         const farPlane = this.isMobile ? 8000 : 20000; 
         this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1.0, farPlane);
@@ -183,7 +183,7 @@ class SeaExplorer {
         // Sky blue for real sea look
         const seaBlue = new THREE.Color(0x70d1ff); 
         this.inspectScene.background = seaBlue;
-        this.inspectScene.fog = new THREE.FogExp2(0x70d1ff, 0.01);
+        this.inspectScene.fog = new THREE.FogExp2(0x70d1ff, 0.002);
 
         this.inspectCamera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
         this.inspectCamera.position.set(0, 0, 40); 
