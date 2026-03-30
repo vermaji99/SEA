@@ -68,7 +68,7 @@ class SeaExplorer {
         
         this.models = [];
         this.mixers = [];
-        this.originalCameraPos = new THREE.Vector3(0, 150, 600);
+        this.originalCameraPos = new THREE.Vector3(0, -750, 600);
         this.bubbles = null;
         
         // --- PERFORMANCE OPTIMIZATION ---
@@ -133,7 +133,7 @@ class SeaExplorer {
         const farPlane = this.isMobile ? 8000 : 20000; 
         this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1.0, farPlane);
         this.camera.position.copy(this.originalCameraPos);
-        this.camera.lookAt(0, -100, 0);
+        this.camera.lookAt(0, -1000, 0);
 
         this.renderer = new THREE.WebGLRenderer({ 
             antialias: false, // Post-processing handles this via FXAA/Bloom
@@ -447,7 +447,7 @@ class SeaExplorer {
 
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
-        floor.position.y = -100; 
+        floor.position.y = -1000; 
         floor.receiveShadow = !this.isMobile; 
         this.scene.add(floor);
 
@@ -488,21 +488,21 @@ class SeaExplorer {
                 name: 'Gourami', 
                 path: 'models/gourami/ccb4cf930c2342ffbe63a09e81d667ad_Textured.gltf', 
                 type: 'small', 
-                pos: new THREE.Vector3(-250, -80, 300),
+                pos: new THREE.Vector3(-250, -850, 300),
                 fact: 'Gouramis are vibrant tropical fish with unique labyrinth organs.'
             },
             { 
                 name: 'Jellyfish', 
                 path: 'models/jellyfish/679b5ec2efb8401f97ee7dd5ac54fa29_Textured.gltf', 
                 type: 'medium', 
-                pos: new THREE.Vector3(300, 20, -400),
+                pos: new THREE.Vector3(300, -200, -400),
                 fact: 'Jellyfish are mesmerizing ancient creatures of the deep blue.'
             },
             { 
                 name: 'Sea Creature', 
                 path: 'models/unknown/211f0b2dd3f349e1ab33ed9addf89e82.gltf', 
                 type: 'medium', 
-                pos: new THREE.Vector3(-150, -90, -150),
+                pos: new THREE.Vector3(-150, -1000, -150),
                 fact: 'A beautiful and mysterious organism thriving on the ocean floor.'
             },
             { 
@@ -516,21 +516,21 @@ class SeaExplorer {
                 name: 'Great White Shark', 
                 path: 'models/shark/50a97b0669ac4884a156838cd9ad06e5_Textured.gltf', 
                 type: 'large', 
-                pos: new THREE.Vector3(-800, 80, -700),
+                pos: new THREE.Vector3(-800, -300, -700),
                 fact: 'The Great White Shark is one of the ocean\'s most formidable predators.'
             },
             { 
                 name: 'Sea Green Turtle', 
                 path: 'models/turtle/0530386d3fef4157b10dbbdb4688e758_Textured.gltf', 
                 type: 'medium', 
-                pos: new THREE.Vector3(500, -20, -600),
+                pos: new THREE.Vector3(500, -500, -600),
                 fact: 'Sea turtles are gentle marine reptiles that travel thousands of miles across oceans.'
             },
             { 
                 name: 'Starfish', 
                 path: 'models/starfish/ab733098dac54b17acdc663e1d341a2a_Textured.gltf', 
                 type: 'small', 
-                pos: new THREE.Vector3(50, -98, 50),
+                pos: new THREE.Vector3(50, -995, 50),
                 fact: 'Starfish are not actually fish; they are echinoderms related to sea urchins.'
             },
             { 
@@ -560,7 +560,7 @@ class SeaExplorer {
                 name: 'Stingray', 
                 path: 'models/stingray/6babc34772b840348e7c7db56b430863_Textured.gltf', 
                 type: 'medium', 
-                pos: new THREE.Vector3(150, -95, 600),
+                pos: new THREE.Vector3(150, -990, 600),
                 fact: 'Stingrays are flat-bodied fish that often bury themselves in the sand.'
             },
             { 
@@ -588,15 +588,22 @@ class SeaExplorer {
                 loader.load(config.path, (gltf) => {
                     const model = gltf.scene;
                     
-                    // Force geometry centering
+                    // Force geometry centering (or bottom alignment for floor creatures)
                     const box = new THREE.Box3().setFromObject(model);
                     const center = box.getCenter(new THREE.Vector3());
-                    model.position.sub(center);
+                    const size = box.getSize(new THREE.Vector3());
+                    
+                    if (config.name === 'Sea Creature') {
+                        // Align the bottom of the model to the origin of the wrapper
+                        model.position.set(-center.x, -box.min.y, -center.z);
+                    } else {
+                        // Standard volume centering
+                        model.position.sub(center);
+                    }
 
                     const wrapper = new THREE.Group();
                     wrapper.add(model);
 
-                    const size = box.getSize(new THREE.Vector3());
                     const maxDim = Math.max(size.x, size.y, size.z);
                     
                     let s = 1.0;
@@ -1163,12 +1170,12 @@ class SeaExplorer {
     }
 
     checkCollisions() {
-        // Floor collision
-        if (this.camera.position.y < -380) this.camera.position.y = -380;
-        if (this.camera.position.y > 1000) this.camera.position.y = 1000;
+        // Floor collision (Floor is at -1000)
+        if (this.camera.position.y < -980) this.camera.position.y = -980;
+        if (this.camera.position.y > 2000) this.camera.position.y = 2000;
         
         // Bounds collision
-        const limit = 2500;
+        const limit = 5000;
         if (Math.abs(this.camera.position.x) > limit) this.camera.position.x = Math.sign(this.camera.position.x) * limit;
         if (Math.abs(this.camera.position.z) > limit) this.camera.position.z = Math.sign(this.camera.position.z) * limit;
     }
