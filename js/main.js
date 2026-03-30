@@ -2,6 +2,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 class SeaExplorer {
     constructor() {
@@ -83,34 +87,74 @@ class SeaExplorer {
         this.init();
     }
 
+    setupPostProcessing() {
+        // --- 1. MAIN COMPOSER ---
+        this.composer = new EffectComposer(this.renderer);
+        const renderPass = new RenderPass(this.scene, this.camera);
+        this.composer.addPass(renderPass);
+
+        // UnrealBloomPass( resolution, strength, radius, threshold )
+        const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            0.4, // UHD: Subtle natural bloom
+            0.5, // Radius
+            0.85 // Threshold: only bright emissives glow
+        );
+        this.composer.addPass(bloomPass);
+
+        const outputPass = new OutputPass();
+        this.composer.addPass(outputPass);
+
+        // --- 2. INSPECT COMPOSER ---
+        this.inspectComposer = new EffectComposer(this.renderer);
+        const inspectRenderPass = new RenderPass(this.inspectScene, this.inspectCamera);
+        this.inspectComposer.addPass(inspectRenderPass);
+
+        const inspectBloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            0.4, // UHD: Subtle natural bloom
+            0.5,
+            0.85
+        );
+        this.inspectComposer.addPass(inspectBloomPass);
+
+        const inspectOutputPass = new OutputPass();
+        this.inspectComposer.addPass(inspectOutputPass);
+    }
+
     async init() {
         // --- MAIN SCENE SETUP ---
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0xa3d8f4);
-        this.scene.fog = new THREE.FogExp2(0xa3d8f4, this.isMobile ? 0.0015 : 0.001); // Slightly denser fog on mobile to hide shorter draw distance
+        // Sky blue / light green-blue
+        const seaBlue = new THREE.Color(0x70d1ff); 
+        this.scene.background = seaBlue;
+        this.scene.fog = new THREE.FogExp2(0x70d1ff, this.isMobile ? 0.0015 : 0.001); 
 
-        const farPlane = this.isMobile ? 8000 : 20000; // Shorter draw distance for mobile performance
+        const farPlane = this.isMobile ? 8000 : 20000; 
         this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1.0, farPlane);
         this.camera.position.copy(this.originalCameraPos);
         this.camera.lookAt(0, -100, 0);
 
         this.renderer = new THREE.WebGLRenderer({ 
-            antialias: !this.isMobile, 
-            logarithmicDepthBuffer: !this.isMobile, // Disable for mobile speed
+            antialias: false, // Post-processing handles this via FXAA/Bloom
+            logarithmicDepthBuffer: !this.isMobile, 
             powerPreference: 'high-performance', 
             precision: this.isMobile ? 'mediump' : 'highp' 
         });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(this.pixelRatio);
-        this.renderer.shadowMap.enabled = !this.isMobile; // Disable shadows on mobile for smoothness
+        this.renderer.shadowMap.enabled = !this.isMobile; 
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.0; 
+        this.renderer.toneMappingExposure = 1.0; // UHD: More natural brightness
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.container.appendChild(this.renderer.domElement);
 
         // --- INSPECT SCENE SETUP ---
         this.setupInspectScene();
+
+        // --- NEW: POST-PROCESSING (FOR THE GLOW) ---
+        this.setupPostProcessing();
 
         // --- COMMON SETUP ---
         this.setupLighting();
@@ -136,123 +180,74 @@ class SeaExplorer {
     setupInspectScene() {
         // --- 1. CLEAN SLATE SETUP ---
         this.inspectScene = new THREE.Scene();
-        // A softer Sky Blue for better contrast
-        const skyBlue = new THREE.Color(0xa3d8f4); 
-        this.inspectScene.background = skyBlue;
-        this.inspectScene.fog = new THREE.FogExp2(0xa3d8f4, 0.008);
+        // Sky blue for real sea look
+        const seaBlue = new THREE.Color(0x70d1ff); 
+        this.inspectScene.background = seaBlue;
+        this.inspectScene.fog = new THREE.FogExp2(0x70d1ff, 0.01);
 
         this.inspectCamera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        this.inspectCamera.position.set(0, 0, 30); 
+        this.inspectCamera.position.set(0, 0, 40); 
 
-        // --- 2. BALANCED STUDIO LIGHTING ---
-        // Subtle blue-tinted lights for "real sea" color depth
-        const ambient = new THREE.AmbientLight(0xddeeff, 0.8); 
+        // --- 2. BALANCED LIGHTING ---
+        const ambient = new THREE.AmbientLight(0xffffff, 0.6); 
         this.inspectScene.add(ambient);
 
-        const hemi = new THREE.HemisphereLight(0xffffff, 0x004488, 0.6); 
+        const hemi = new THREE.HemisphereLight(0xffffff, 0x44aaff, 0.4); 
         this.inspectScene.add(hemi);
 
-        // Key light (Main illumination)
-        const sun = new THREE.DirectionalLight(0xffffff, 1.4); 
+        // Key light
+        const sun = new THREE.DirectionalLight(0xffffff, 1.2); 
         sun.position.set(20, 30, 45);
         sun.castShadow = true;
+        sun.shadow.mapSize.set(2048, 2048); // UHD shadows
         this.inspectScene.add(sun);
 
-        // Fill light (Softens shadows)
-        const fill = new THREE.DirectionalLight(0x88ccff, 1.0);
+        // Fill light
+        const fill = new THREE.DirectionalLight(0x88ccff, 0.5);
         fill.position.set(-30, 15, 25);
         this.inspectScene.add(fill);
 
-        // Rim light (Back highlights)
-        const rim = new THREE.DirectionalLight(0xaaddff, 1.2); 
-        rim.position.set(0, 10, -50);
-        this.inspectScene.add(rim);
-
-        // --- NEW: BOTTOM LIGHT FOR STINGRAY VISIBILITY ---
-        const bottomLight = new THREE.DirectionalLight(0xffffff, 1.5);
-        bottomLight.position.set(0, -40, 0);
-        bottomLight.castShadow = !this.isMobile; // Optimization
-        this.inspectScene.add(bottomLight);
-
-        const bottomFill = new THREE.PointLight(0x88ccff, 1.0, 100);
-        bottomFill.position.set(0, -20, 0);
-        this.inspectScene.add(bottomFill);
-
         // Headlight (Follows camera)
-        this.inspectHeadlight = new THREE.PointLight(0xffffff, 0.8, 200); 
+        this.inspectHeadlight = new THREE.PointLight(0xffffff, 0.6, 200); 
         this.inspectScene.add(this.inspectHeadlight);
 
-        // --- 3. FLOATING PARTICLES (Marine Snow) ---
-        const particleCount = this.isMobile ? 150 : 500; // Optimized count
-        const geometry = new THREE.BufferGeometry();
-        const positions = new Float32Array(particleCount * 3);
-        for (let i = 0; i < particleCount * 3; i++) {
-            positions[i] = (Math.random() - 0.5) * 100;
-        }
-        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        const material = new THREE.PointsMaterial({
-            color: 0xffffff,
-            size: this.isMobile ? 0.2 : 0.1, // Larger particles for better visibility on mobile
-            transparent: true,
-            opacity: 0.4, 
-            blending: THREE.AdditiveBlending
-        });
-        this.inspectParticles = new THREE.Points(geometry, material);
-        this.inspectScene.add(this.inspectParticles);
-
-        // --- 4. GROUND BASE (SEA FLOOR) ---
+        // --- 3. NATURAL GROUND BASE (SEA FLOOR) ---
         const texLoader = this.texLoader;
         const sandTexture = texLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/terrain/grasslight-big.jpg'); 
         sandTexture.wrapS = sandTexture.wrapT = THREE.RepeatWrapping;
-        sandTexture.repeat.set(10, 10);
+        sandTexture.repeat.set(15, 15);
+        sandTexture.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
 
-        const floorGeo = new THREE.CircleGeometry(50, this.isMobile ? 32 : 64); // Lower detail for mobile
+        const floorGeo = new THREE.CircleGeometry(150, 64); 
         const floorMat = new THREE.MeshStandardMaterial({
             color: 0xfff4d1,
             map: sandTexture,
-            roughness: 0.8,
-            metalness: 0.1,
-            transparent: true,
-            opacity: 0.7 
+            roughness: 1.0,
+            metalness: 0.0
         });
 
         this.inspectFloor = new THREE.Mesh(floorGeo, floorMat);
         this.inspectFloor.rotation.x = -Math.PI / 2;
-        this.inspectFloor.position.y = -10; 
-        this.inspectFloor.receiveShadow = !this.isMobile; // Optimization
+        this.inspectFloor.position.y = -15; 
+        this.inspectFloor.receiveShadow = true;
         this.inspectScene.add(this.inspectFloor);
 
-        // --- 5. ENVIRONMENT MAP (CRITICAL FOR PBR TEXTURES) ---
+        // --- 4. ENVIRONMENT MAP ---
         const pmremGenerator = new THREE.PMREMGenerator(this.renderer);
         const envScene = new THREE.Scene();
         envScene.add(new THREE.AmbientLight(0xffffff, 10)); 
-        const envLight1 = new THREE.PointLight(0xffffff, 100);
-        envLight1.position.set(10, 10, 10);
-        envScene.add(envLight1);
-        const envLight2 = new THREE.PointLight(0xffffff, 100);
-        envLight2.position.set(-10, -10, -10);
-        envScene.add(envLight2);
         this.inspectScene.environment = pmremGenerator.fromScene(envScene).texture;
-        
-        // Clean up temp PMREM scene
         pmremGenerator.dispose();
-        envScene.traverse(child => {
-            if (child.isMesh) {
-                child.geometry.dispose();
-                child.material.dispose();
-            }
-        });
 
-        // --- 6. PROFESSIONAL ORBIT CONTROLS ---
+        // --- 5. ORBIT CONTROLS ---
         this.inspectControls = new OrbitControls(this.inspectCamera, this.renderer.domElement);
         this.inspectControls.enableDamping = true;
         this.inspectControls.dampingFactor = 0.05;
         this.inspectControls.enablePan = false;
         this.inspectControls.autoRotate = true;
-        this.inspectControls.autoRotateSpeed = 1.0;
-        this.inspectControls.minDistance = 5;
-        this.inspectControls.maxDistance = 100;
-        this.inspectControls.target.set(0, 0, 0); 
+        this.inspectControls.autoRotateSpeed = 0.5;
+        this.inspectControls.minDistance = 10;
+        this.inspectControls.maxDistance = 150;
         this.inspectControls.enabled = false;
     }
 
@@ -265,7 +260,7 @@ class SeaExplorer {
         sunLight.position.set(50, 500, 50);
         sunLight.castShadow = !this.isMobile; // Optimization
         if (!this.isMobile) {
-            sunLight.shadow.mapSize.set(1024, 1024); // Lowered from 2048 for better PC performance too
+            sunLight.shadow.mapSize.set(2048, 2048); // UHD: Increased from 1024
         }
         this.scene.add(sunLight);
 
@@ -438,9 +433,10 @@ class SeaExplorer {
         const sandTexture = texLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/terrain/grasslight-big.jpg'); 
         sandTexture.wrapS = sandTexture.wrapT = THREE.RepeatWrapping;
         sandTexture.repeat.set(100, 100);
+        sandTexture.anisotropy = this.renderer.capabilities.getMaxAnisotropy(); // UHD
 
         // Lower segment count for mobile (1x1 vs 8x8)
-        const segments = this.isMobile ? 1 : 8;
+        const segments = this.isMobile ? 1 : 16; // UHD: Increased segments
         const floorGeo = new THREE.PlaneGeometry(10000, 10000, segments, segments); 
         const floorMat = new THREE.MeshStandardMaterial({
             color: 0xfff4d1, 
@@ -492,87 +488,94 @@ class SeaExplorer {
                 name: 'Gourami', 
                 path: 'models/gourami/ccb4cf930c2342ffbe63a09e81d667ad_Textured.gltf', 
                 type: 'small', 
-                pos: new THREE.Vector3(-400, -20, 200),
+                pos: new THREE.Vector3(-250, -80, 300),
                 fact: 'Gouramis are vibrant tropical fish with unique labyrinth organs.'
             },
             { 
                 name: 'Jellyfish', 
                 path: 'models/jellyfish/679b5ec2efb8401f97ee7dd5ac54fa29_Textured.gltf', 
                 type: 'medium', 
-                pos: new THREE.Vector3(200, 50, -300),
+                pos: new THREE.Vector3(300, 20, -400),
                 fact: 'Jellyfish are mesmerizing ancient creatures of the deep blue.'
             },
             { 
                 name: 'Sea Creature', 
                 path: 'models/unknown/211f0b2dd3f349e1ab33ed9addf89e82.gltf', 
                 type: 'medium', 
-                pos: new THREE.Vector3(-100, -80, -100),
+                pos: new THREE.Vector3(-150, -90, -150),
                 fact: 'A beautiful and mysterious organism thriving on the ocean floor.'
             },
             { 
                 name: 'Humpback Whale', 
                 path: 'models/whale/2a72200995344602a4daab15e8872766_Textured.gltf', 
                 type: 'large', 
-                pos: new THREE.Vector3(800, 150, 600),
+                pos: new THREE.Vector3(1000, 200, 800),
                 fact: 'The Humpback Whale is a giant of the sea, known for its haunting songs.'
             },
             { 
                 name: 'Great White Shark', 
                 path: 'models/shark/50a97b0669ac4884a156838cd9ad06e5_Textured.gltf', 
                 type: 'large', 
-                pos: new THREE.Vector3(-600, 50, -500),
+                pos: new THREE.Vector3(-800, 80, -700),
                 fact: 'The Great White Shark is one of the ocean\'s most formidable predators.'
             },
             { 
                 name: 'Sea Green Turtle', 
                 path: 'models/turtle/0530386d3fef4157b10dbbdb4688e758_Textured.gltf', 
                 type: 'medium', 
-                pos: new THREE.Vector3(400, -40, -500),
+                pos: new THREE.Vector3(500, -20, -600),
                 fact: 'Sea turtles are gentle marine reptiles that travel thousands of miles across oceans.'
             },
             { 
                 name: 'Starfish', 
                 path: 'models/starfish/ab733098dac54b17acdc663e1d341a2a_Textured.gltf', 
                 type: 'small', 
-                pos: new THREE.Vector3(0, -95, 0), // Positioned on the sea floor
+                pos: new THREE.Vector3(50, -98, 50),
                 fact: 'Starfish are not actually fish; they are echinoderms related to sea urchins.'
             },
             { 
                 name: 'Oarfish', 
                 path: 'models/oarfish/12a7a91318614fa69bb5e12710f585d9_Textured.gltf', 
                 type: 'large', 
-                pos: new THREE.Vector3(-1000, 200, -800),
-                rotation: new THREE.Euler(Math.PI, Math.PI, 0), // Fix upside down and mirror issue
+                pos: new THREE.Vector3(-1200, 250, -1000),
+                rotation: new THREE.Euler(Math.PI, Math.PI, 0),
                 fact: 'The Oarfish is the longest bony fish in the world, often mistaken for a sea serpent.'
             },
             { 
                 name: 'Bottlenose Dolphin', 
                 path: 'models/dolphin/d165e4ce842d408e99133f77f1fc37fb_Textured.gltf', 
                 type: 'medium', 
-                pos: new THREE.Vector3(500, 100, 300),
+                pos: new THREE.Vector3(600, 120, 400),
                 fact: 'Bottlenose Dolphins are highly intelligent and social marine mammals.'
             },
             { 
                 name: 'Clownfish', 
                 path: 'models/clownfish/80365cf8644744ff8f8fddc24670e073_Textured.gltf', 
                 type: 'small', 
-                pos: new THREE.Vector3(-200, -50, 400),
-                rotation: new THREE.Euler(Math.PI, 0, 0), // Fix upside down issue
+                pos: new THREE.Vector3(-220, -70, 450),
+                rotation: new THREE.Euler(Math.PI, 0, 0),
                 fact: 'Clownfish have a symbiotic relationship with sea anemones.'
             },
             { 
                 name: 'Stingray', 
                 path: 'models/stingray/6babc34772b840348e7c7db56b430863_Textured.gltf', 
                 type: 'medium', 
-                pos: new THREE.Vector3(100, -90, 500),
+                pos: new THREE.Vector3(150, -95, 600),
                 fact: 'Stingrays are flat-bodied fish that often bury themselves in the sand.'
             },
             { 
                 name: 'Schooling Fish', 
                 path: 'models/schooling_fish/ce39f76cfab649fab1fa97d855cb56ac_Textured.gltf', 
                 type: 'medium', 
-                pos: new THREE.Vector3(-300, 40, -400),
+                pos: new THREE.Vector3(-400, 60, -500),
                 fact: 'Schooling fish swim in coordinated groups to protect themselves from predators.'
+            },
+            { 
+                name: 'Glow Whale', 
+                path: 'models/glow_whale/b682779d8ee8498fa4f5da64ad804a76_Textured.gltf', 
+                type: 'large', 
+                pos: new THREE.Vector3(-1500, 350, 1200),
+                fact: 'The Glow Whale is a bioluminescent leviathan that uses radiant patterns to communicate in the lightless midnight zone.'
             }
         ];
 
@@ -726,12 +729,15 @@ class SeaExplorer {
         const tex = this.texLoader.load(path);
         tex.colorSpace = THREE.SRGBColorSpace;
         
-        // --- TEXTURE OPTIMIZATION ---
+        // --- UHD TEXTURE OPTIMIZATION ---
         if (this.isMobile) {
-            tex.minFilter = THREE.LinearFilter; // Faster than mipmapping on some devices
-            tex.anisotropy = 1; // Disable anisotropy for speed
+            tex.minFilter = THREE.LinearFilter; 
+            tex.anisotropy = 1; 
         } else {
+            // Set anisotropy to the maximum supported by the GPU for UHD clarity
             tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+            tex.magFilter = THREE.LinearFilter;
+            tex.minFilter = THREE.LinearMipmapLinearFilter;
         }
         
         return tex;
@@ -763,13 +769,22 @@ class SeaExplorer {
 
         // --- 1. GLOBAL BIOLOGICAL REALISM (Eyes, Mouth, Teeth) ---
         
-        // EYES: Deep Glossy Black
+        // EYES: Natural colors with depth
         if (lowerName.includes('eye') || lowerName.includes('pupil') || lowerName.includes('iris') || lowerName.includes('cornea')) {
+            let eyeColor = 0x020202; // Default: very dark brown
+            if (name.includes('dolphin') || name.includes('whale')) {
+                eyeColor = 0x050505; // Dark, intelligent eyes
+            } else if (name.includes('shark')) {
+                eyeColor = 0x000000; // Pure black for sharks
+            } else if (name.includes('turtle')) {
+                eyeColor = 0x1a0e04; // Warm brown for turtles
+            }
+
             child.material = new THREE.MeshStandardMaterial({
-                color: 0x010101,
-                roughness: 0.05,
-                metalness: 0.2,
-                envMapIntensity: 1.0
+                color: eyeColor,
+                roughness: 0.1, // Slight gloss
+                metalness: 0.1,
+                envMapIntensity: 0.5
             });
             return;
         }
@@ -795,7 +810,17 @@ class SeaExplorer {
 
         // --- 2. SPECIES SPECIFIC HD TEXTURES ---
         
-        if (name.includes('whale')) {
+        if (name.includes('glow whale')) {
+            mat.map = this.loadTexture('models/glow_whale/5bbaaed708be44079abe04984c2defd1_RGB_glow_whale.png');
+            mat.normalMap = this.texLoader.load('models/glow_whale/7369058890c3419eb7a3f9b154583ee8_N_glow_whale_normal.png');
+            mat.emissiveMap = this.loadTexture('models/glow_whale/0095d6e36af446f8b0be48f40b14eded_RGB_glow_whale_illum.png');
+            // Use White for emissive to preserve the map's original colors (cyan horns, yellow spots)
+            mat.emissive = new THREE.Color(0xffffff); 
+            mat.emissiveIntensity = 2.0; // UHD: More natural bioluminescence
+            mat.roughness = 0.3; // Natural skin
+            mat.metalness = 0.2; 
+            mat.envMapIntensity = 1.0; 
+        } else if (name === 'humpback whale' || (name.includes('whale') && !name.includes('glow'))) {
             mat.map = this.loadTexture('models/whale/517e977d58914f18b1edd559053aa6c3_RGB_BARBS_BaseColor.png');
             mat.normalMap = this.texLoader.load('models/whale/de9c4c2c440c413cbedbc604a0f5fe1a_N_BARBSl_Normal.png');
             mat.roughnessMap = this.texLoader.load('models/whale/3b4cc1debebd41baa0532e97d97ac95b_R_BARBS_Roughness.png');
@@ -935,9 +960,6 @@ class SeaExplorer {
             mat.metalness = 0.1;
             mat.envMapIntensity = 1.0;
             mat.side = THREE.DoubleSide;
-            // Add subtle emissive to see the bottom in dark areas
-            mat.emissive = new THREE.Color(0x222222);
-            mat.emissiveIntensity = 0.2;
         } else if (name.includes('schooling')) {
             mat.map = this.loadTexture('models/schooling_fish/7ae31c21c8e545d095e29d21de1d1122_RGB_texture_Double_Saddle_Fish.png');
             mat.roughness = 0.8;
@@ -954,12 +976,13 @@ class SeaExplorer {
         this.isFreeSwim = false;
         
         // --- 1. PREPARE INTERFACE ---
-        this.pointerLockControls.unlock();
+        if (this.pointerLockControls.isLocked) {
+            this.pointerLockControls.unlock();
+        }
         this.orbitControls.enabled = false;
         this.inspectControls.enabled = true;
         this.inspectContainer.classList.remove('hidden');
         document.getElementById('ui-overlay').classList.add('hidden');
-        document.getElementById('reticle').classList.add('hidden');
         document.getElementById('inspect-name').innerText = model.userData.name;
         document.getElementById('inspect-fact').innerText = model.userData.fact || "Exploring this majestic creature.";
 
@@ -975,15 +998,25 @@ class SeaExplorer {
         }
 
         // --- 3. LOAD ACTUAL MODEL FROM SOURCE ---
-        // Instead of cloning a potentially static instance, we reload from original source
         const loader = new GLTFLoader(this.loadingManager);
         const modelPath = model.userData.sourcePath; 
+        
+        // Ensure we are in a clean state while loading
+        this.inspectCamera.position.set(0, 5, 30);
+        this.inspectControls.target.set(0, 0, 0);
+        this.inspectControls.update();
+
         if (!modelPath) {
             console.error("No source path found for model:", model.userData.name);
+            // Immediate fallback to cloning if no path
+            this.createInspectFallback(model);
             return;
         }
 
         loader.load(modelPath, (gltf) => {
+            // Re-check if we are still in inspect mode (user might have closed it quickly)
+            if (!this.isInspecting) return;
+
             const loadedModel = gltf.scene;
             
             // --- 4. PERFECT PIVOT CENTERING ---
@@ -994,7 +1027,7 @@ class SeaExplorer {
             // Offset the inner model so its volume center is at (0,0,0)
             loadedModel.position.set(-center.x, -center.y, -center.z);
 
-            // Apply orientation fix from config if available (e.g., Oarfish, Clownfish)
+            // Apply orientation fix from config if available
             if (model.userData.rotation) {
                 loadedModel.rotation.copy(model.userData.rotation);
             }
@@ -1015,7 +1048,6 @@ class SeaExplorer {
             loadedModel.traverse(child => {
                 child.layers.set(0);
                 
-                // Hide common utility or occluder meshes
                 const lowerName = child.name.toLowerCase();
                 if (lowerName.includes('occluder') || lowerName.includes('shell') || lowerName.includes('box') || lowerName.includes('collider')) {
                     child.visible = false;
@@ -1024,19 +1056,17 @@ class SeaExplorer {
 
                 if (child.isMesh && child.material) {
                     child.material = child.material.clone();
-                    
-                    // --- APPLY CENTRALIZED REALISM & HD TEXTURES ---
                     this.applyAdvancedTextures(child, model.userData.name);
                     
-                    // Additional Inspect-Mode specific tweaks
-                    if (!child.material.name.includes('eye') && !child.material.name.includes('mouth')) {
-                        child.material.envMapIntensity = 0.4; // Controlled reflections
+                    const matName = child.material.name ? child.material.name.toLowerCase() : "";
+                    if (!matName.includes('eye') && !matName.includes('mouth')) {
+                        child.material.envMapIntensity = 0.4;
                     }
                     child.material.needsUpdate = true;
                 }
             });
 
-            // --- 5. ANIMATIONS (Fresh from source) ---
+            // --- 5. ANIMATIONS ---
             if (gltf.animations && gltf.animations.length > 0) {
                 this.inspectMixer = new THREE.AnimationMixer(loadedModel);
                 const action = this.inspectMixer.clipAction(gltf.animations[0]);
@@ -1044,20 +1074,49 @@ class SeaExplorer {
                 action.play();
             }
 
-            // Camera Reset
-            this.inspectCamera.position.set(0, 5, 30);
-            this.inspectControls.reset();
-            this.inspectControls.target.set(0, 0, 0);
-            this.inspectControls.update();
-
         }, undefined, (error) => {
             console.error("Error reloading model for Inspect Mode:", error);
-            // Fallback to cloning if reload fails
-            const fallback = model.clone();
-            this.inspectModel = new THREE.Group();
-            this.inspectModel.add(fallback);
-            this.inspectScene.add(this.inspectModel);
+            this.createInspectFallback(model);
         });
+    }
+
+    createInspectFallback(model) {
+        if (!this.isInspecting) return;
+        
+        const fallback = model.clone();
+        
+        // Remove animation wrappers or previous scaling
+        const box = new THREE.Box3().setFromObject(fallback);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        
+        // Find the actual model inside the wrapper
+        let actualModel = fallback;
+        if (fallback.children.length > 0) {
+            actualModel = fallback.children[0];
+            actualModel.position.set(-center.x, -center.y, -center.z);
+        } else {
+            fallback.position.set(-center.x, -center.y, -center.z);
+        }
+
+        this.inspectModel = new THREE.Group();
+        this.inspectModel.add(fallback);
+        this.inspectScene.add(this.inspectModel);
+
+        const maxDim = Math.max(size.x, size.y, size.z) || 1;
+        const scaleFactor = 15 / maxDim;
+        this.inspectModel.scale.setScalar(scaleFactor);
+        this.inspectModel.userData.baseScale = scaleFactor;
+        this.inspectModel.userData.phase = 0;
+
+        // Try to sync animation if possible
+        const originalMixer = this.mixers.find(m => m.getRoot() === model.children[0]);
+        if (originalMixer && fallback.children[0]) {
+            this.inspectMixer = new THREE.AnimationMixer(fallback.children[0]);
+            if (model.userData.animations && model.userData.animations.length > 0) {
+                this.inspectMixer.clipAction(model.userData.animations[0]).play();
+            }
+        }
     }
 
     closeInspectMode() {
@@ -1097,6 +1156,10 @@ class SeaExplorer {
         this.inspectCamera.updateProjectionMatrix();
 
         this.renderer.setSize(width, height);
+        
+        // Update composers
+        if (this.composer) this.composer.setSize(width, height);
+        if (this.inspectComposer) this.inspectComposer.setSize(width, height);
     }
 
     checkCollisions() {
@@ -1147,14 +1210,14 @@ class SeaExplorer {
                 this.inspectModel.rotation.z = sway;
             }
 
-            // 4. Animate Marine Snow (Particles)
-            if (this.inspectParticles) {
-                this.inspectParticles.rotation.y += delta * 0.05;
-                this.inspectParticles.position.y += Math.sin(time * 0.5) * 0.01;
-            }
-
             this.inspectControls.update();
-            this.renderer.render(this.inspectScene, this.inspectCamera);
+            
+            // Render using composer for glow effect
+            if (this.inspectComposer) {
+                this.inspectComposer.render();
+            } else {
+                this.renderer.render(this.inspectScene, this.inspectCamera);
+            }
             return; 
         }
 
@@ -1236,7 +1299,12 @@ class SeaExplorer {
             this.bubbles.instanceMatrix.needsUpdate = true;
         }
 
-        this.renderer.render(this.scene, this.camera);
+        // Render using composer for glow effect
+        if (this.composer) {
+            this.composer.render();
+        } else {
+            this.renderer.render(this.scene, this.camera);
+        }
     }
 }
 
