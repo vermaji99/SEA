@@ -976,8 +976,12 @@ class SeaExplorer {
 
         // --- 3. LOAD ACTUAL MODEL FROM SOURCE ---
         // Instead of cloning a potentially static instance, we reload from original source
-        const loader = new GLTFLoader();
-        const modelPath = model.userData.sourcePath || 'models/shark.glb'; // Fallback if path missing
+        const loader = new GLTFLoader(this.loadingManager);
+        const modelPath = model.userData.sourcePath; 
+        if (!modelPath) {
+            console.error("No source path found for model:", model.userData.name);
+            return;
+        }
 
         loader.load(modelPath, (gltf) => {
             const loadedModel = gltf.scene;
@@ -1157,17 +1161,16 @@ class SeaExplorer {
         // --- OPTIMIZED MAIN SCENE UPDATES ---
         const dummy = new THREE.Object3D();
         
-        // 1. Update mixers and visibility (Distance Culling)
-        for (const mixer of this.mixers) {
-            const root = mixer.getRoot();
-            if (root) {
-                const dist = this.camera.position.distanceTo(root.position);
-                if (dist < 3000) {
-                    mixer.update(delta);
-                    root.visible = true;
-                } else {
-                    root.visible = false; 
-                }
+        // 1. Update mixers and visibility (Distance Culling for ALL models)
+        for (const model of this.models) {
+            const dist = this.camera.position.distanceTo(model.position);
+            const isNear = dist < 3500; // Increased range slightly
+            model.visible = isNear;
+            
+            // If near, also update its mixer if it has one
+            if (isNear) {
+                const mixer = this.mixers.find(m => m.getRoot() === model.children[0]);
+                if (mixer) mixer.update(delta);
             }
         }
 
