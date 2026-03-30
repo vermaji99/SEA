@@ -116,15 +116,20 @@ class SeaExplorer {
         this.setupControls();
         this.setupEnvironment();
         if (this.isMobile) this.setupMobileControls();
-        await this.loadModels();
-        this.setupUIEvents();
-
+        
+        // Start rendering immediately so user sees background/fog instead of black
         window.addEventListener('resize', () => this.onWindowResize());
         this.animate();
 
+        // Load all models in parallel for speed
+        await this.loadModels();
+        this.setupUIEvents();
+
         const loadingScreen = document.getElementById('loading-screen');
-        loadingScreen.style.opacity = '0';
-        setTimeout(() => loadingScreen.style.display = 'none', 1000);
+        if (loadingScreen) {
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => loadingScreen.style.display = 'none', 1000);
+        }
     }
 
     setupInspectScene() {
@@ -565,12 +570,11 @@ class SeaExplorer {
         ];
 
         const progressBar = document.getElementById('progress-bar');
-        const texLoader = new THREE.TextureLoader();
-        texLoader.colorSpace = THREE.SRGBColorSpace;
+        const texLoader = this.texLoader; // Use the manager-linked loader
+        let loadedCount = 0;
 
-        for (let i = 0; i < animalConfigs.length; i++) {
-            const config = animalConfigs[i];
-            await new Promise(resolve => {
+        const loadPromises = animalConfigs.map(config => {
+            return new Promise(resolve => {
                 loader.load(config.path, (gltf) => {
                     const model = gltf.scene;
                     
@@ -593,248 +597,25 @@ class SeaExplorer {
                     wrapper.scale.setScalar(s);
                     wrapper.position.copy(config.pos);
                     
-                    // Apply custom rotation if specified in config
                     if (config.rotation) {
                         model.rotation.copy(config.rotation);
                     }
                     
-                    // ADVANCED TEXTURING & VISIBILITY
                     wrapper.traverse(child => {
                         if (child.isMesh) {
                             child.castShadow = true;
                             child.receiveShadow = true;
-
-                            // --- SET EYES TO DARK BLACK (REALISM) ---
-                            const lowerName = child.name.toLowerCase();
-                            if (lowerName.includes('eye') || lowerName.includes('pupil') || lowerName.includes('iris') || lowerName.includes('cornea')) {
-                                if (child.material) {
-                                    child.material = new THREE.MeshStandardMaterial({
-                                        color: 0x010101, // Even deeper pure black
-                                        roughness: 0.05, // Extremely glossy
-                                        metalness: 0.2,
-                                        envMapIntensity: 1.0
-                                    });
-                                }
-                                return;
-                            }
-
-                            // Skip custom texturing for teeth to maintain original color
-                            if (lowerName.includes('teeth') || lowerName.includes('tooth')) {
-                                if (child.material) {
-                                    child.material = child.material.clone();
-                                    child.material.envMapIntensity = 0.5; // Very low reflection for teeth to look solid
-                                }
-                                return;
-                            }
-
-                            // --- APPLY VIBRANT BLOOD RED TO INTERNAL PARTS (REALISM) ---
-                            // Broadened search for mouth/internal parts
-                            const internalKeywords = ['mouth', 'throat', 'inner', 'tongue', 'gills', 'stomach', 'flesh', 'oral', 'cavity', 'interior', 'gum'];
-                            if (internalKeywords.some(kw => lowerName.includes(kw))) {
-                                child.material = new THREE.MeshStandardMaterial({
-                                    color: 0xcc0000, // More vibrant and obvious "Blood Red"
-                                    roughness: 0.2,  // Slightly wet
-                                    metalness: 0.0,
-                                    envMapIntensity: 0.0, // Zero reflection to keep the color pure red
-                                    side: THREE.DoubleSide
-                                });
-                                return;
-                            }
-
-                            // Apply specific HD textures based on model name
-                            if (config.name === 'Humpback Whale') {
-                                child.material = new THREE.MeshStandardMaterial({
-                                    map: this.loadTexture('models/whale/517e977d58914f18b1edd559053aa6c3_RGB_BARBS_BaseColor.png'),
-                                    normalMap: texLoader.load('models/whale/de9c4c2c440c413cbedbc604a0f5fe1a_N_BARBSl_Normal.png'),
-                                    roughnessMap: texLoader.load('models/whale/3b4cc1debebd41baa0532e97d97ac95b_R_BARBS_Roughness.png'),
-                                    aoMap: texLoader.load('models/whale/2d54593132d147efa3d80da737484db1_R_Humpback_AOMap.png'),
-                                    roughness: 1.0,
-                                    metalness: 0.1,
-                                    envMapIntensity: 2.0,
-                                    transparent: false,
-                                    opacity: 1.0
-                                });
-                            } else if (config.name === 'Jellyfish') {
-                                const isHead = lowerName.includes('head') || lowerName.includes('bell') || lowerName.includes('top') || lowerName.includes('umbrella');
-                                const isTentacle = lowerName.includes('tentacle') || lowerName.includes('string') || lowerName.includes('tail') || lowerName.includes('long');
-                                
-                                child.material = new THREE.MeshStandardMaterial({
-                                    color: isHead ? 0xff3366 : (isTentacle ? 0xcc0033 : 0xff6699), // Vibrant Pink Head, Darker Red Tentacles, Pink Body
-                                    map: this.loadTexture('models/jellyfish/d33dc71b1cb2495c8ca853e932a44560_A_pacificseanettle_color.png'),
-                                    normalMap: texLoader.load('models/jellyfish/1c6fee613dc84dc7a6ed72c5dce9e28d_A_pacificseanettle_normal.png'),
-                                    roughnessMap: texLoader.load('models/jellyfish/30494735e1be4430abf99b02e13c0d36_RGB_pacificseanettle_rough.png'),
-                                    roughness: 0.2,
-                                    metalness: 0.1,
-                                    envMapIntensity: 1.0,
-                                    transparent: false, // Fully opaque as requested
-                                    opacity: 1.0,
-                                    emissive: isHead ? new THREE.Color(0x330011) : new THREE.Color(0x220000),
-                                    emissiveIntensity: 0.5,
-                                    side: THREE.DoubleSide
-                                });
-                            } else if (config.name === 'Gourami') {
-                                child.material = new THREE.MeshStandardMaterial({
-                                    map: this.loadTexture('models/gourami/54eaf75cb74144dc9add0dfd95b14483_A_4K_Gourami_Fish_Blue_Diffuse.png'),
-                                    normalMap: texLoader.load('models/gourami/d9ba0be84ca249acb23769d2c40e8f40_N_4K_Gourami_Fish_Blue_Normal.png'),
-                                    roughnessMap: texLoader.load('models/gourami/5876e0bbf6024728831b949acd7277f0_R_4K_Gourami_Fish_Blue_Metallic_Roughness.png'),
-                                    aoMap: texLoader.load('models/gourami/966281069d84403a9e8e4e87411028dd_R_4K_Gourami_Fish_Blue_AO.png'),
-                                    roughness: 1.0,
-                                    metalness: 0.2,
-                                    envMapIntensity: 1.0,
-                                    transparent: false, // Ensure no transparency
-                                    opacity: 1.0,
-                                    side: THREE.DoubleSide, // Ensure visibility from both sides
-                                    depthWrite: true,
-                                    depthTest: true
-                                });
-                            } else if (config.name === 'Sea Creature') {
-                                child.material = new THREE.MeshStandardMaterial({
-                                    map: this.loadTexture('models/unknown/1985ecec8f04458695ceea918530ce35_RGB_texture_diffuse.png'),
-                                    normalMap: texLoader.load('models/unknown/e8cd43f1274b4c80b1971ffa8dcd5ed7_N_texture_normal.png'),
-                                    roughnessMap: texLoader.load('models/unknown/445e5350e60c4ff9913f9401b4e9596a_R_texture_roughness.png'),
-                                    metalnessMap: texLoader.load('models/unknown/30f1b6a740b34b3caa93fdc258c0d702_R_texture_metallic.png'),
-                                    roughness: 1.0,
-                                    metalness: 1.0,
-                                    envMapIntensity: 2.0,
-                                    transparent: false,
-                                    opacity: 1.0
-                                });
-                            } else if (config.name === 'Great White Shark') {
-                                child.material = new THREE.MeshStandardMaterial({
-                                    map: this.loadTexture('models/shark/52646c54e64041fcb8fe2ca488742981_RGB_great_white_shark_color.png'),
-                                    normalMap: texLoader.load('models/shark/07b10039ec1645c5ac3349b7e015bcaf_N_great_white_shark_normal.png'),
-                                    roughnessMap: texLoader.load('models/shark/7a75b9c4020f4a3cbab994d421894bb7_R_great_white_shark_rough.png'),
-                                    roughness: 0.8,
-                                    metalness: 0.1,
-                                    envMapIntensity: 2.0,
-                                    transparent: false,
-                                    opacity: 1.0
-                                });
-                            } else if (config.name === 'Sea Green Turtle') {
-                                child.material = new THREE.MeshStandardMaterial({
-                                    map: this.loadTexture('models/turtle/55cdc0252b344fc59f8a416bacfbcc54_RGB_SeaTurtle_Albedo_v2.png'),
-                                    normalMap: texLoader.load('models/turtle/1ed79e34833a4d9e9dd53b52abd72564_N_SeaTurtle_Normal.png'),
-                                    roughnessMap: texLoader.load('models/turtle/cf21e1811af644deb93a4bccdb2f1283_R_SeaTurtle_Roughness.png'),
-                                    aoMap: texLoader.load('models/turtle/2cfdf44f1b284822be3100e43207d5c3_R_SeaTurtle_Ao.png'),
-                                    roughness: 1.0,
-                                    metalness: 0.0,
-                                    envMapIntensity: 2.0,
-                                    transparent: false,
-                                    opacity: 1.0
-                                });
-                            } else if (config.name === 'Starfish') {
-                                child.material = new THREE.MeshStandardMaterial({
-                                    color: 0xff6600, // Vibrant Orange Starfish
-                                    map: this.loadTexture('models/starfish/2f3444c8b2c94fc8ae8eba660392721a_RGB_star_model_only_star_BaseColor.png'),
-                                    normalMap: texLoader.load('models/starfish/c4c137e1fd654e46b99a92bb5c98a996_N_star_model_only_star_Normal.png'),
-                                    roughnessMap: texLoader.load('models/starfish/24537916bce446f1a5e37caac0b29a80_R_star_model_only_star_Roughness.png'),
-                                    metalnessMap: texLoader.load('models/starfish/e17ea2c5dab64fd0ba1cced093dcb29c_R_star_model_only_star_Metallic.png'),
-                                    roughness: 0.8,
-                                    metalness: 0.0,
-                                    envMapIntensity: 1.0,
-                                    emissive: new THREE.Color(0x331100), // Subtle warm glow
-                                    emissiveIntensity: 0.2,
-                                    transparent: false,
-                                    opacity: 1.0
-                                });
-                            } else if (config.name === 'Oarfish') {
-                                const lowerChildName = child.name.toLowerCase();
-                                if (lowerChildName.includes('eye')) {
-                                    child.material = new THREE.MeshStandardMaterial({
-                                        map: this.loadTexture('models/oarfish/fbccb191e4a04872b64e8b0f98514336_RGB_Regalecus_glesne_low_eye_BaseColor.png'),
-                                        normalMap: texLoader.load('models/oarfish/26cd06e236794f0eb7ecd9c9d4ffe0f8_N_Regalecus_glesne_low_eye_Normal.png'),
-                                        roughnessMap: texLoader.load('models/oarfish/fa6647868f85469caab195bab24f211e_R_Regalecus_glesne_low_eye_Roughness.png'),
-                                        metalnessMap: texLoader.load('models/oarfish/c2868a858b7e41b593ef6e87b452198d_RGB_Regalecus_glesne_low_eye_Metallic.png'),
-                                        roughness: 0.05,
-                                        metalness: 0.5,
-                                        envMapIntensity: 1.0
-                                    });
-                                } else if (lowerChildName.includes('fin')) {
-                                    child.material = new THREE.MeshStandardMaterial({
-                                        color: 0xff0000,
-                                        emissive: 0xaa0000,
-                                        emissiveIntensity: 0.5,
-                                        map: this.loadTexture('models/oarfish/bb6a5df390994ba78c92ecfecce9f1ed_RGB_Regalecus_glesne_low_body_BaseColor.png'),
-                                        alphaMap: texLoader.load('models/oarfish/e4f6664e02f04a4e95af7b9a28ce028f_A_Regalecus_glesne_alpha.png'),
-                                        roughness: 0.3,
-                                        metalness: 0.2,
-                                        envMapIntensity: 0.5,
-                                        transparent: true,
-                                        opacity: 1.0,
-                                      side: THREE.DoubleSide
-                                  });
-                              } else if (config.name === 'Stingray') {
-                                   child.material = new THREE.MeshStandardMaterial({
-                                       map: this.loadTexture('models/stingray/93c965dfed57433b8d491e33bf0f33a0_RGB_Sea_Ray_Stingray_Diffuse.png'),
-                                       normalMap: texLoader.load('models/stingray/335894ec98c04293a8fbaabf09faa2aa_N_Sea_Ray_Stingray_Normal.png'),
-                                       roughnessMap: texLoader.load('models/stingray/22f6703b2be44683a5b320d837bd702e_R_Sea_Ray_Stingray_Metallic_Roughness.png'),
-                                       aoMap: texLoader.load('models/stingray/e2a7da80ab7943ae8ce2d4e352d9c661_R_Sea_Ray_Stingray_AO.png'),
-                                       roughness: 0.8,
-                                       metalness: 0.1,
-                                       envMapIntensity: 1.0,
-                                       side: THREE.DoubleSide,
-                                       emissive: new THREE.Color(0x222222),
-                                       emissiveIntensity: 0.2
-                                   });
-                               } else {
-                                    child.material = new THREE.MeshStandardMaterial({
-                                        map: this.loadTexture('models/oarfish/bb6a5df390994ba78c92ecfecce9f1ed_RGB_Regalecus_glesne_low_body_BaseColor.png'),
-                                        normalMap: texLoader.load('models/oarfish/3abbc74818d941bdbea33975c0b4eab7_N_Regalecus_glesne_low_body_Normal.png'),
-                                        roughnessMap: texLoader.load('models/oarfish/4fff89c104bb416bbd72ddd0c8d129d1_R_Regalecus_glesne_low_body_Roughness.png'),
-                                        metalnessMap: texLoader.load('models/oarfish/2ef7d29f7d2a446391c0ecc68b5bf187_RGB_Regalecus_glesne_specular.png'),
-                                        roughness: 0.4,
-                                        metalness: 0.8,
-                                        envMapIntensity: 1.5,
-                                        side: THREE.DoubleSide
-                                    });
-                                }
-                            } else if (config.name === 'Bottlenose Dolphin') {
-                                child.material = new THREE.MeshStandardMaterial({
-                                    map: this.loadTexture('models/dolphin/c90700b9891f401084a6070e171e26e3_RGB_bottlenose_dolphin_color.png'),
-                                    normalMap: texLoader.load('models/dolphin/08c49536e43347848423c7a51e7c4c68_N_bottlenose_dolphin_normal.png'),
-                                    roughnessMap: texLoader.load('models/dolphin/7c8f13a4f8e44aa08ef99ba7fc5eac03_R_bottlenose_dolphin_rough.png'),
-                                    metalnessMap: texLoader.load('models/dolphin/85b68f5095c241599f5ae7c882a152fe_RGB_bottlenose_dolphin_spec.png'),
-                                    roughness: 0.8,
-                                    metalness: 0.1,
-                                     envMapIntensity: 1.0,
-                                     transparent: false,
-                                     opacity: 1.0
-                                 });
-                             } else if (config.name === 'Clownfish') {
-                                 child.material = new THREE.MeshStandardMaterial({
-                                     map: this.loadTexture('models/clownfish/d9d749a9d97a4963bd99b2b080eed4fb_RGB_clownfish_COLOR.png'),
-                                     normalMap: texLoader.load('models/clownfish/a200d9f8db674b4a8def77c642cd271c_N_clownfish_NRM.png'),
-                                     roughnessMap: texLoader.load('models/clownfish/c69d7b1a9da9411ab0afae7bed1b29a7_R_clownfish_ROUGH.png'),
-                                     metalnessMap: texLoader.load('models/clownfish/01a0069b31964baa821b9995d4e86370_R_clownfish_SPEC.png'),
-                                     roughness: 0.6,
-                                     metalness: 0.0,
-                                     envMapIntensity: 1.0,
-                                     transparent: false,
-                                     opacity: 1.0,
-                                     side: THREE.DoubleSide
-                                 });
-                             } else if (config.name === 'Schooling Fish') {
-                                 child.material = new THREE.MeshStandardMaterial({
-                                     map: this.loadTexture('models/schooling_fish/7ae31c21c8e545d095e29d21de1d1122_RGB_texture_Double_Saddle_Fish.png'),
-                                     roughness: 0.8,
-                                     metalness: 0.1,
-                                     envMapIntensity: 1.0,
-                                     side: THREE.DoubleSide
-                                 });
-                             }
-                            
-                            // --- SUPPLEMENTARY ADVANCED TEXTURING ---
                             this.applyAdvancedTextures(child, config.name);
                         }
                     });
 
                     wrapper.userData = {
-                        isSeaAnimal: true, // Specific tag for root identification
+                        isSeaAnimal: true,
                         name: config.name,
                         fact: config.fact,
-                        sourcePath: config.path, // Store path for reloading
-                        animations: gltf.animations, // Store original animations
-                        rotation: config.rotation, // Store original rotation fix
+                        sourcePath: config.path,
+                        animations: gltf.animations,
+                        rotation: config.rotation,
                         phase: Math.random() * Math.PI * 2,
                         originalPos: wrapper.position.clone(),
                         velocity: new THREE.Vector3((Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.05, (Math.random() - 0.5) * 0.1)
@@ -849,14 +630,18 @@ class SeaExplorer {
                         this.mixers.push(mixer);
                     }
 
-                    progressBar.style.width = `${((i + 1) / animalConfigs.length) * 100}%`;
+                    loadedCount++;
+                    if (progressBar) progressBar.style.width = `${(loadedCount / animalConfigs.length) * 100}%`;
                     resolve();
                 }, undefined, (error) => {
-                    console.error(`Error loading model ${config.name}:`, error);
-                    resolve(); // Resolve anyway to continue with other models
+                    console.error(`Error loading ${config.name}:`, error);
+                    loadedCount++;
+                    resolve(); 
                 });
             });
-        }
+        });
+
+        await Promise.all(loadPromises);
     }
 
     setupUIEvents() {
@@ -958,6 +743,41 @@ class SeaExplorer {
         
         const name = animalName.toLowerCase();
         const mat = child.material;
+        const lowerName = child.name.toLowerCase();
+
+        // --- 1. GLOBAL BIOLOGICAL REALISM (Eyes, Mouth, Teeth) ---
+        
+        // EYES: Deep Glossy Black
+        if (lowerName.includes('eye') || lowerName.includes('pupil') || lowerName.includes('iris') || lowerName.includes('cornea')) {
+            child.material = new THREE.MeshStandardMaterial({
+                color: 0x010101,
+                roughness: 0.05,
+                metalness: 0.2,
+                envMapIntensity: 1.0
+            });
+            return;
+        }
+
+        // TEETH: Preserve original color but lower reflection
+        if (lowerName.includes('teeth') || lowerName.includes('tooth')) {
+            mat.envMapIntensity = 0.5;
+            return;
+        }
+
+        // MOUTH/INTERNAL: Vibrant Blood Red
+        const internalKeywords = ['mouth', 'throat', 'inner', 'tongue', 'gills', 'stomach', 'flesh', 'oral', 'cavity', 'interior', 'gum'];
+        if (internalKeywords.some(kw => lowerName.includes(kw))) {
+            child.material = new THREE.MeshStandardMaterial({
+                color: 0xcc0000,
+                roughness: 0.2, 
+                metalness: 0.0,
+                envMapIntensity: 0.0, 
+                side: THREE.DoubleSide
+            });
+            return;
+        }
+
+        // --- 2. SPECIES SPECIFIC HD TEXTURES ---
         
         if (name.includes('whale')) {
             mat.map = this.loadTexture('models/whale/517e977d58914f18b1edd559053aa6c3_RGB_BARBS_BaseColor.png');
@@ -1175,59 +995,23 @@ class SeaExplorer {
             loadedModel.traverse(child => {
                 child.layers.set(0);
                 
-                // Hide common utility or occluder meshes that might be in GLTF files
+                // Hide common utility or occluder meshes
                 const lowerName = child.name.toLowerCase();
                 if (lowerName.includes('occluder') || lowerName.includes('shell') || lowerName.includes('box') || lowerName.includes('collider')) {
                     child.visible = false;
                     return;
                 }
 
-                // --- SET EYES TO DARK BLACK (REALISM) ---
-                if (lowerName.includes('eye') || lowerName.includes('pupil') || lowerName.includes('iris') || lowerName.includes('cornea')) {
-                    if (child.isMesh && child.material) {
-                        child.material = new THREE.MeshStandardMaterial({
-                            color: 0x010101, // Deep Dark Black
-                            roughness: 0.05, // Glossy reflection
-                            metalness: 0.2,
-                            envMapIntensity: 1.0
-                        });
-                    }
-                    return;
-                }
-
-                // Keep original teeth colors
-                if (lowerName.includes('teeth') || lowerName.includes('tooth')) {
-                    if (child.isMesh && child.material) {
-                        child.material = child.material.clone();
-                        child.material.envMapIntensity = 0.5; // Reduce reflection on teeth to see their color
-                    }
-                    return;
-                }
-
-                // --- APPLY VIBRANT BLOOD RED TO INTERNAL PARTS (REALISM) ---
-                const internalKeywords = ['mouth', 'throat', 'inner', 'tongue', 'gills', 'stomach', 'flesh', 'oral', 'cavity', 'interior', 'gum'];
-                if (internalKeywords.some(kw => lowerName.includes(kw))) {
-                    child.material = new THREE.MeshStandardMaterial({
-                        color: 0xcc0000, // Vibrant red for obvious mouth interior
-                        roughness: 0.2, 
-                        metalness: 0.0,
-                        envMapIntensity: 0.0, 
-                        side: THREE.DoubleSide
-                    });
-                    return;
-                }
-
                 if (child.isMesh && child.material) {
                     child.material = child.material.clone();
                     
-                    // --- APPLY ADVANCED HD TEXTURES ---
+                    // --- APPLY CENTRALIZED REALISM & HD TEXTURES ---
                     this.applyAdvancedTextures(child, model.userData.name);
                     
-                    child.material.envMapIntensity = 0.2; // Drastically reduced to prevent metallic look
-                    child.material.roughness = 1.0; // Ensure matte finish for skin
-                    child.material.metalness = 0.0; // Ensure no metallic sheen
-                    child.material.side = THREE.FrontSide;
-                    child.material.transparent = child.material.transparent || lowerName.includes('glass') || lowerName.includes('water');
+                    // Additional Inspect-Mode specific tweaks
+                    if (!child.material.name.includes('eye') && !child.material.name.includes('mouth')) {
+                        child.material.envMapIntensity = 0.4; // Controlled reflections
+                    }
                     child.material.needsUpdate = true;
                 }
             });
