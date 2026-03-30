@@ -87,17 +87,18 @@ class SeaExplorer {
         // --- MAIN SCENE SETUP ---
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0xa3d8f4);
-        this.scene.fog = new THREE.FogExp2(0xa3d8f4, 0.001);
+        this.scene.fog = new THREE.FogExp2(0xa3d8f4, this.isMobile ? 0.0015 : 0.001); // Slightly denser fog on mobile to hide shorter draw distance
 
-        this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1.0, 20000);
+        const farPlane = this.isMobile ? 8000 : 20000; // Shorter draw distance for mobile performance
+        this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1.0, farPlane);
         this.camera.position.copy(this.originalCameraPos);
         this.camera.lookAt(0, -100, 0);
 
         this.renderer = new THREE.WebGLRenderer({ 
-            antialias: !this.isMobile, // Disable antialiasing on mobile for performance
-            logarithmicDepthBuffer: true,
-            powerPreference: 'high-performance', // Hint to browser for GPU use
-            precision: this.isMobile ? 'mediump' : 'highp' // Adjust precision for mobile
+            antialias: !this.isMobile, 
+            logarithmicDepthBuffer: !this.isMobile, // Disable for mobile speed
+            powerPreference: 'high-performance', 
+            precision: this.isMobile ? 'mediump' : 'highp' 
         });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(this.pixelRatio);
@@ -256,7 +257,8 @@ class SeaExplorer {
     }
 
     setupLighting() {
-        const ambientLight = new THREE.AmbientLight(0xa3d8f4, 1.4); 
+        const ambientIntensity = this.isMobile ? 1.0 : 1.4;
+        const ambientLight = new THREE.AmbientLight(0xa3d8f4, ambientIntensity); 
         this.scene.add(ambientLight);
 
         const sunLight = new THREE.DirectionalLight(0xffffff, 1.8);
@@ -267,8 +269,11 @@ class SeaExplorer {
         }
         this.scene.add(sunLight);
 
-        const hemiLight = new THREE.HemisphereLight(0xa3d8f4, 0xfff4d1, 1.0); 
-        this.scene.add(hemiLight);
+        // Only add hemisphere light on PC for better depth
+        if (!this.isMobile) {
+            const hemiLight = new THREE.HemisphereLight(0xa3d8f4, 0xfff4d1, 1.0); 
+            this.scene.add(hemiLight);
+        }
     }
 
     setupControls() {
@@ -429,12 +434,14 @@ class SeaExplorer {
     setupEnvironment() {
         const texLoader = this.texLoader;
         
-        // Vast Bright Sand Floor (Brighter and larger)
+        // Vast Bright Sand Floor
         const sandTexture = texLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/terrain/grasslight-big.jpg'); 
         sandTexture.wrapS = sandTexture.wrapT = THREE.RepeatWrapping;
         sandTexture.repeat.set(100, 100);
 
-        const floorGeo = new THREE.PlaneGeometry(10000, 10000); // Reduced from 20000 for performance
+        // Lower segment count for mobile (1x1 vs 8x8)
+        const segments = this.isMobile ? 1 : 8;
+        const floorGeo = new THREE.PlaneGeometry(10000, 10000, segments, segments); 
         const floorMat = new THREE.MeshStandardMaterial({
             color: 0xfff4d1, 
             map: sandTexture,
@@ -445,7 +452,7 @@ class SeaExplorer {
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
         floor.position.y = -100; 
-        floor.receiveShadow = !this.isMobile; // Optimization
+        floor.receiveShadow = !this.isMobile; 
         this.scene.add(floor);
 
         // Efficient Bubbles using InstancedMesh (Massive Performance Win)
@@ -718,6 +725,15 @@ class SeaExplorer {
     loadTexture(path) {
         const tex = this.texLoader.load(path);
         tex.colorSpace = THREE.SRGBColorSpace;
+        
+        // --- TEXTURE OPTIMIZATION ---
+        if (this.isMobile) {
+            tex.minFilter = THREE.LinearFilter; // Faster than mipmapping on some devices
+            tex.anisotropy = 1; // Disable anisotropy for speed
+        } else {
+            tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+        }
+        
         return tex;
     }
 
